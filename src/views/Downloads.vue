@@ -182,6 +182,8 @@
 </template>
 
 <script>
+import { createApiRequest, API_ENDPOINTS } from '../config/api'
+
 export default {
   data() {
     return {
@@ -288,7 +290,7 @@ export default {
     async downloadFile(file) {
       try {
         const filePath = file.path.replace('processed_files/', '')
-        const response = await fetch(`http://localhost:8000/api/download/${encodeURIComponent(filePath)}`)
+        const response = await createApiRequest(API_ENDPOINTS.DOWNLOAD(filePath))
         
         if (!response.ok) {
           throw new Error('Failed to download file')
@@ -311,8 +313,7 @@ export default {
 
     async cleanupFiles() {
       try {
-        
-        const response = await fetch('http://localhost:8000/api/files/cleanup', {
+        const response = await createApiRequest(API_ENDPOINTS.CLEANUP_FILES, {
           method: 'POST'
         })
         

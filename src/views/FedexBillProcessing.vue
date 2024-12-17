@@ -92,6 +92,8 @@
 </template>
 
 <script>
+import { createApiRequest, API_ENDPOINTS, getApiUrl } from '../config/api'
+
 export default {
   name: 'FedexBillProcessing',
   
@@ -126,24 +128,24 @@ export default {
     },
 
     async processFile() {
-      if (!this.canSubmit) return
+      if (!this.selectedFile) return
 
       this.isProcessing = true
       this.error = null
       this.processedData = null
 
-      try {
-        const formData = new FormData()
-        formData.append('file', this.selectedFile)
+      const formData = new FormData()
+      formData.append('file', this.selectedFile)
 
-        const response = await fetch('http://localhost:8000/api/process/fedex-bill', {
+      try {
+        const response = await createApiRequest(API_ENDPOINTS.PROCESS_FEDEX_BILL, {
           method: 'POST',
           body: formData
         })
 
         if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.detail || 'Failed to process file')
+          const errorData = await response.json()
+          throw new Error(errorData.detail || 'Failed to process file')
         }
 
         const result = await response.json()
@@ -167,7 +169,7 @@ export default {
       if (!this.downloadFile) return
 
       try {
-        const response = await fetch(`http://localhost:8000/api/download/${this.downloadFile}`)
+        const response = await createApiRequest(API_ENDPOINTS.DOWNLOAD(this.downloadFile))
         if (!response.ok) {
           const errorData = await response.json().catch(() => null)
           throw new Error(errorData?.detail || `Download failed with status: ${response.status}`)

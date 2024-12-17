@@ -376,7 +376,7 @@
 
 <script>
 import * as XLSX from 'xlsx';
-import { supabaseDb } from '../config/supabase';
+import { createApiRequest, API_ENDPOINTS } from '../config/api'
 import { useToast } from 'vue-toastification';
 
 export default {
@@ -570,7 +570,7 @@ export default {
       formData.append('file', this.selectedFile);
 
       try {
-        const response = await fetch('http://localhost:8000/api/compare-shipping-costs', {
+        const response = await createApiRequest(API_ENDPOINTS.COMPARE_SHIPPING_COSTS, {
           method: 'POST',
           body: formData
         });
