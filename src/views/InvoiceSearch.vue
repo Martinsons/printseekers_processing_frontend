@@ -401,20 +401,31 @@ const searchType = ref('invoice')
 const searchQuery = ref('')
 const selectedStatus = ref('All Statuses')
 const additionalStatusFilter = ref('')
-const filterNoResults = ref(false)
 const invoiceResults = ref([])
 const error = ref(null)
 const successMessage = ref('')
+const isSending = ref(false)
 const isLoading = ref(false)
 const isSaving = ref(false)
-const isSending = ref(false)
-const editingRecord = ref(null)
-const selectedRows = ref(new Set())
 const hasSearched = ref(false)
-const availableInvoices = ref([])
+const selectedRows = ref(new Set())
+const editingRecord = ref(null)
+const editedValues = ref({
+  fedex_cost: null,
+  sent_cost: null,
+  dimensions: null,
+  sent_dimensions: null,
+  service_type: null,
+  sent_service_type: null
+})
 const isLoadingInvoices = ref(false)
-const sendingProgress = ref(0)
+const availableInvoices = ref([])
+const filterNoResults = ref(false)
+
+// Progress tracking
+const progress = ref(0)
 const totalToSend = ref(0)
+const sent = ref(0)
 
 // Computed properties
 const hasResults = computed(() => invoiceResults.value.length > 0)
@@ -436,26 +447,39 @@ const fetchInvoiceNumbers = async () => {
   }
 }
 
+const refreshInvoiceNumbers = async () => {
+  if (searchType.value === 'invoice') {
+    await fetchInvoiceNumbers()
+  }
+}
+
 const filteredResults = computed(() => {
-  if (!invoiceResults.value) return []
+  if (!invoiceResults.value) {
+    filterNoResults.value = true
+    return []
+  }
   
   let results = [...invoiceResults.value]
-  console.log('Initial results:', results)
 
   // Apply invoice number filter if it exists
   if (searchType.value === 'invoice' && searchQuery.value) {
     results = results.filter(record => 
-      record.invoice_number.toLowerCase().includes(searchQuery.value.toLowerCase())
+      record.invoice_number?.toLowerCase().includes(searchQuery.value.toLowerCase())
+    )
+  }
+
+  // Apply tracking number filter if it exists
+  if (searchType.value === 'tracking' && searchQuery.value) {
+    results = results.filter(record => 
+      record.tracking_number?.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
   }
 
   // Apply status filter if selected and not "All Statuses"
   if (selectedStatus.value && selectedStatus.value !== 'All Statuses') {
-    results = results.filter(record => {
-      const matches = record.stage?.toLowerCase() === selectedStatus.value?.toLowerCase()
-      console.log(`Comparing record stage: ${record.stage} with selected: ${selectedStatus.value}, matches: ${matches}`)
-      return matches
-    })
+    results = results.filter(record => 
+      record.stage?.toLowerCase() === selectedStatus.value.toLowerCase()
+    )
   }
 
   // Apply additional status filter if selected
@@ -465,8 +489,7 @@ const filteredResults = computed(() => {
     )
   }
 
-  console.log('Final filtered results:', results)
-  filterNoResults.value = results.length === 0
+  filterNoResults.value = results.length === 0 && hasSearched.value
   return results
 })
 
@@ -514,42 +537,37 @@ const searchPlaceholder = computed(() => {
 
 // Methods
 const performSearch = async () => {
-  if (!canSearch.value) return
+  if (!searchQuery.value && searchType.value !== 'status') {
+    error.value = 'Please enter a search term'
+    return
+  }
 
   try {
     isLoading.value = true
     error.value = null
-    additionalStatusFilter.value = '' // Reset additional status filter on new search
+    hasSearched.value = true
 
-    console.log('Performing search with type:', searchType.value, searchType.value === 'status' ? 'status:' + selectedStatus.value : 'query:' + searchQuery.value)
+    let query = supabaseDb.from('invoice_records').select('*')
 
-    // Query the database based on search type
-    const query = supabaseDb
-      .from('invoice_records')
-      .select('*')
-
-    if (searchType.value === 'invoice') {
-      query.ilike('invoice_number', `%${searchQuery.value}%`)
-    } else if (searchType.value === 'tracking') {
-      query.ilike('tracking_number', `%${searchQuery.value}%`)
-    } else if (searchType.value === 'status' && selectedStatus.value) {
-      query.eq('stage', selectedStatus.value)
+    if (searchType.value === 'invoice' && searchQuery.value) {
+      query = query.ilike('invoice_number', `%${searchQuery.value}%`)
+    } else if (searchType.value === 'tracking' && searchQuery.value) {
+      query = query.ilike('tracking_number', `%${searchQuery.value}%`)
+    } else if (searchType.value === 'status' && selectedStatus.value !== 'All Statuses') {
+      query = query.eq('stage', selectedStatus.value)
     }
 
     const { data, error: searchError } = await query
-    
+
     if (searchError) throw searchError
 
-    // Update results
     invoiceResults.value = data || []
-    hasSearched.value = true
-    console.log('Search returned results:', invoiceResults.value)
-
+    
+    // Refresh invoice numbers after search
+    await refreshInvoiceNumbers()
   } catch (err) {
-    console.error('Search error:', err)
+    console.error('Error performing search:', err)
     error.value = 'Failed to perform search: ' + err.message
-    invoiceResults.value = []
-    hasSearched.value = true
   } finally {
     isLoading.value = false
   }
@@ -582,10 +600,34 @@ const downloadResults = () => {
       'Updated At': formatDate(record.updated_at)
     }))
 
-    // Create worksheet
+    // Calculate summary for sent items
+    const sentItems = invoiceResults.value.filter(record => record.stage === 'Sent')
+    const summary = {
+      totalRecords: invoiceResults.value.length,
+      sentRecords: sentItems.length,
+      totalFedExCost: sentItems.reduce((sum, record) => sum + (record.fedex_cost || 0), 0),
+      totalSentCost: sentItems.reduce((sum, record) => sum + (record.sent_cost || 0), 0),
+      totalDifference: sentItems.reduce((sum, record) => sum + (record.cost_difference || 0), 0)
+    }
+
+    // Create main data worksheet
     const worksheet = XLSX.utils.json_to_sheet(excelData)
+    
+    // Create summary worksheet
+    const summaryData = [
+      ['Summary of Sent Items'],
+      ['Total Records', summary.totalRecords],
+      ['Sent Records', summary.sentRecords],
+      ['Total FedEx Cost', formatCurrency(summary.totalFedExCost)],
+      ['Total Sent Cost', formatCurrency(summary.totalSentCost)],
+      ['Total Difference', formatCurrency(summary.totalDifference)]
+    ]
+    const summaryWorksheet = XLSX.utils.aoa_to_sheet(summaryData)
+
+    // Create and populate workbook
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Search Results')
+    XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Summary')
 
     // Generate filename with timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -649,7 +691,7 @@ const showSuccessMessage = (message) => {
   successMessage.value = message
   setTimeout(() => {
     successMessage.value = ''
-  }, 3000)
+  }, 5000)
 }
 
 // API Functions
@@ -747,14 +789,17 @@ const updateField = async (updateData) => {
   }
 }
 
-const clearSearch = () => {
+const clearSearch = async () => {
   searchQuery.value = ''
-  selectedStatus.value = ''
+  selectedStatus.value = 'All Statuses'
   additionalStatusFilter.value = ''
   invoiceResults.value = []
+  error.value = null
   hasSearched.value = false
   selectedRows.value.clear()
-  error.value = null
+  
+  // Refresh invoice numbers after clearing
+  await refreshInvoiceNumbers()
 }
 
 const saveEditing = async () => {
@@ -859,6 +904,11 @@ const sendSelectedToFedex = async () => {
       selectedRows.value.has(record.id)
     )
 
+    // Reset progress tracking
+    progress.value = 0
+    totalToSend.value = selectedRecords.length
+    sent.value = 0
+
     // Prepare FedEx data for all selected records
     const fedexData = selectedRecords.map(record => {
       const names = record.recipient.split(' ')
@@ -866,6 +916,7 @@ const sendSelectedToFedex = async () => {
       const lastName = names.slice(1).join(' ') || firstName
 
       return {
+        record_id: record.id, // Add record_id for tracking
         NAME: firstName,
         SURNAME: lastName,
         'E-MAIL': 'fedex-invoices@printseekers.com',
@@ -896,27 +947,37 @@ const sendSelectedToFedex = async () => {
     
     // Initialize results tracking
     let processResults = []
+    let updatedRecords = new Set()
     
     // Send each record to FedEx API and track results
     for (const data of fedexData) {
       const currentRecord = selectedRecords.find(r => r.invoice_number === data.INVOICE_NUMBER)
-      
       if (!currentRecord) continue
 
       try {
+        // Update UI to show processing state
+        invoiceResults.value = invoiceResults.value.map(record => {
+          if (record.id === data.record_id) {
+            return { ...record, stage: 'Processing' }
+          }
+          return record
+        })
+
         await sendToFedexApi(data)
         
-        // Update stage to "Sent" immediately after successful send
+        // Update stage to "Sent" after successful send
         const { error: updateError } = await supabaseDb
           .from('invoice_records')
           .update({ stage: 'Sent' })
-          .eq('id', currentRecord.id)
+          .eq('id', data.record_id)
 
         if (updateError) throw updateError
 
+        updatedRecords.add(data.record_id)
+        
         // Update local state
         invoiceResults.value = invoiceResults.value.map(record => {
-          if (record.id === currentRecord.id) {
+          if (record.id === data.record_id) {
             return { ...record, stage: 'Sent' }
           }
           return record
@@ -932,17 +993,21 @@ const sendSelectedToFedex = async () => {
           ERROR_MESSAGE: '',
           TIMESTAMP: new Date().toISOString()
         })
+
+        sent.value++
+        progress.value = (sent.value / totalToSend.value) * 100
       } catch (err) {
-        // Update stage to "Resend" immediately after failed send
+        // Update stage to "Resend" after failed send
         const { error: updateError } = await supabaseDb
           .from('invoice_records')
           .update({ stage: 'Resend' })
-          .eq('id', currentRecord.id)
+          .eq('id', data.record_id)
 
         if (!updateError) {
-          // Update local state only if database update succeeded
+          updatedRecords.add(data.record_id)
+          // Update local state
           invoiceResults.value = invoiceResults.value.map(record => {
-            if (record.id === currentRecord.id) {
+            if (record.id === data.record_id) {
               return { ...record, stage: 'Resend' }
             }
             return record
@@ -960,6 +1025,25 @@ const sendSelectedToFedex = async () => {
           TIMESTAMP: new Date().toISOString()
         })
         console.error(`Error sending to FedEx for invoice ${data.INVOICE_NUMBER}:`, err)
+
+        sent.value++
+        progress.value = (sent.value / totalToSend.value) * 100
+      }
+    }
+
+    // Refresh the data after all updates
+    if (updatedRecords.size > 0) {
+      const { data: refreshedData, error: refreshError } = await supabaseDb
+        .from('invoice_records')
+        .select('*')
+        .in('id', Array.from(updatedRecords))
+
+      if (!refreshError && refreshedData) {
+        // Update the UI with fresh data
+        invoiceResults.value = invoiceResults.value.map(record => {
+          const refreshedRecord = refreshedData.find(r => r.id === record.id)
+          return refreshedRecord || record
+        })
       }
     }
 
@@ -988,18 +1072,20 @@ const sendSelectedToFedex = async () => {
     
     let message = `Successfully sent ${successCount} records to FedEx`
     if (failureCount > 0) {
-      message += `. ${failureCount} records failed - check the log file for details`
+      message += `. ${failureCount} records failed and are marked for resend.`
     }
     showSuccessMessage(message)
-    
+
+    // Clear selection after processing
     selectedRows.value.clear()
   } catch (err) {
-    console.error('Error in FedEx submission process:', err)
-    error.value = 'Error in FedEx submission process: ' + err.message
+    console.error('Error in batch processing:', err)
+    error.value = 'Error processing batch: ' + err.message
   } finally {
     isSending.value = false
-    sendingProgress.value = 0
+    progress.value = 0
     totalToSend.value = 0
+    sent.value = 0
   }
 }
 

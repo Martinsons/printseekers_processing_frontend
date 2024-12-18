@@ -376,7 +376,7 @@
 
 <script>
 import * as XLSX from 'xlsx';
-import { apiRequest, API_ENDPOINTS } from '../config/api'
+import { supabaseDb } from '../config/supabase';
 import { useToast } from 'vue-toastification';
 
 export default {
@@ -570,17 +570,37 @@ export default {
       formData.append('file', this.selectedFile);
 
       try {
-        const result = await apiRequest(API_ENDPOINTS.COMPARE_SHIPPING_COSTS, {
+        const response = await fetch('http://localhost:8000/api/compare-shipping-costs', {
           method: 'POST',
           body: formData
         });
 
-        this.processResults(result.data);
-        this.toast.success('File processed successfully');
-      } catch (error) {
-        console.error('Error processing file:', error);
-        this.toast.error(error.message || 'Failed to process file');
-        this.error = error.message;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to process file');
+        }
+
+        const data = await response.json();
+        if (data.status === 'success') {
+          this.results = this.processResults(data.comparisons.map(item => ({
+            ...item,
+            senderContactName: item.senderContactName || 'N/A',
+            serviceType: item.serviceType || 'N/A',
+            excelDimensions: item.excelDimensions || 'N/A',
+            dimensions: item.dimensions || 'N/A',
+            recipientCountry: item.recipientCountry || 'N/A',
+            productType: item.productType || 'N/A',
+            productCategory: item.productCategory || 'N/A',
+            recipient: item.recipient || 'N/A',
+            serviceData: item.serviceData || 'N/A',
+            deliveryZone: item.deliveryZone || 'N/A'
+          })));
+        } else {
+          throw new Error(data.error || 'Failed to process file');
+        }
+      } catch (err) {
+        this.error = err.message;
+        console.error('Error:', err);
       } finally {
         this.isLoading = false;
         this.isProcessing = false;
@@ -754,13 +774,12 @@ export default {
           sent_status: 'Not sent'
         }));
 
-        const { error } = await apiRequest(API_ENDPOINTS.UPLOAD_SHIPPING_COSTS, {
-          method: 'POST',
-          body: JSON.stringify({ data: recordsToUpload }),
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        const { error } = await supabaseDb
+          .from('invoice_records')
+          .upsert(recordsToUpload, {
+            onConflict: 'tracking_number',
+            ignoreDuplicates: false
+          });
 
         if (error) throw error;
 
@@ -797,13 +816,12 @@ export default {
           sent_status: 'Not Sent'
         }));
 
-        const { error } = await apiRequest(API_ENDPOINTS.UPLOAD_MISSING_DATA, {
-          method: 'POST',
-          body: JSON.stringify({ data: recordsToUpload }),
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        const { error } = await supabaseDb
+          .from('missing_invoice_data')
+          .upsert(recordsToUpload, {
+            onConflict: 'tracking_number',
+            ignoreDuplicates: false
+          });
 
         if (error) throw error;
 
