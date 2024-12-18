@@ -15,16 +15,9 @@ export const apiRequest = async (endpoint, options = {}) => {
   
   // Default options
   const defaultOptions = {
-    mode: 'no-cors',
-    headers: {
-      'Accept': '*/*'
-    }
+    mode: 'cors',
+    headers: {}
   };
-
-  // If it's not a FormData request, add Content-Type header
-  if (!(options.body instanceof FormData)) {
-    defaultOptions.headers['Content-Type'] = 'application/json';
-  }
 
   // Merge options
   const fetchOptions = {
@@ -36,26 +29,27 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
   };
 
+  // Remove Content-Type for FormData
+  if (options.body instanceof FormData) {
+    delete fetchOptions.headers['Content-Type'];
+  }
+
   try {
     const response = await fetch(url, fetchOptions);
     
-    // With no-cors mode, we might not get a proper response status
-    // We'll need to handle this differently
-    if (response.type === 'opaque') {
-      // Return a default success response since we can't read the actual response
-      return { status: 'success' };
-    }
-
     if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
+      const errorData = await response.json().catch(() => ({ 
+        detail: `Request failed with status ${response.status}` 
+      }));
+      
+      throw new Error(
+        Array.isArray(errorData.detail) 
+          ? errorData.detail[0]?.msg || 'Unknown error'
+          : errorData.detail
+      );
     }
 
-    try {
-      return await response.json();
-    } catch (e) {
-      // If we can't parse JSON, return success status
-      return { status: 'success' };
-    }
+    return response.json();
   } catch (error) {
     console.error('API request error:', error);
     throw error;
@@ -65,13 +59,10 @@ export const apiRequest = async (endpoint, options = {}) => {
 // File upload helper
 export const uploadFedExBill = async (file) => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', file, file.name);
 
   return apiRequest(API_ENDPOINTS.PROCESS_FEDEX_BILL, {
     method: 'POST',
-    body: formData,
-    headers: {
-      'Accept': 'application/json'
-    }
+    body: formData
   });
 };

@@ -31,15 +31,15 @@
 
       <div class="flex justify-between items-center">
         <button 
-          @click="processFile"
-          :disabled="!canSubmit || isProcessing"
+          @click="processFile(selectedFile)"
+          :disabled="!canSubmit || loading"
           class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2"
         >
           <span 
-            v-if="isProcessing" 
+            v-if="loading" 
             class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
           />
-          <span>{{ isProcessing ? 'Notiek apstrāde...' : 'Apstrādāt failu' }}</span>
+          <span>{{ loading ? 'Notiek apstrāde...' : 'Apstrādāt failu' }}</span>
         </button>
 
         <button 
@@ -100,7 +100,7 @@ export default {
   data() {
     return {
       selectedFile: null,
-      isProcessing: false,
+      loading: false,
       error: null,
       processedData: null,
       downloadFile: null
@@ -109,7 +109,7 @@ export default {
 
   computed: {
     canSubmit() {
-      return this.selectedFile && !this.isProcessing
+      return this.selectedFile && !this.loading
     }
   },
 
@@ -127,34 +127,23 @@ export default {
       this.error = null
     },
 
-    async processFile() {
-      if (!this.selectedFile) return
-
-      this.isProcessing = true
-      this.error = null
-      this.processedData = null
-      this.downloadFile = null
-
+    async processFile(file) {
       try {
-        const result = await uploadFedExBill(this.selectedFile)
+        this.loading = true;
+        this.error = null;
         
-        // Handle opaque response
-        if (result.status === 'success' && !result.data) {
-          // If we get an opaque response, show a message to check the backend
-          this.error = 'File uploaded. Please check the backend for processing status.'
-          return
-        }
-
-        // Handle normal response
-        if (result.data) {
-          this.processedData = result.data
-          this.downloadFile = result.files?.analysis_file
-        }
+        const result = await uploadFedExBill(file);
+        this.$toast.success('File processed successfully');
+        this.processedData = result.data;
+        this.downloadFile = result.files?.analysis_file;
+        return result;
       } catch (error) {
-        console.error('Error processing file:', error)
-        this.error = error.message || 'Failed to process file'
+        console.error('Error processing file:', error);
+        this.error = error.message || 'Error processing file';
+        this.$toast.error(this.error);
+        throw error;
       } finally {
-        this.isProcessing = false
+        this.loading = false;
       }
     },
 
