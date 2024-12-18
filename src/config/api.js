@@ -9,6 +9,17 @@ export const API_ENDPOINTS = {
   CLEANUP_FILES: '/api/files/cleanup'
 }
 
+/**
+ * Custom error class for API errors
+ */
+class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 // Helper function for API calls
 export const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -40,22 +51,39 @@ export const apiRequest = async (endpoint, options = {}) => {
     
     // Handle opaque response from no-cors mode
     if (response.type === 'opaque') {
-      // We can't read the response body in no-cors mode
-      // Return a standard success response
       return { 
-        status: 'success',
-        message: 'Request sent successfully'
+        success: true,
+        message: 'File uploaded successfully. Please check your email for results.'
       };
     }
 
+    // Handle error responses
     if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
+      let errorMessage = 'An error occurred while processing your request.';
+      
+      if (response.status === 502) {
+        errorMessage = 'The server is currently unavailable. Please try again later.';
+      }
+      
+      throw new ApiError(errorMessage, response.status);
     }
 
-    return response.json();
+    const data = await response.json();
+    return {
+      success: true,
+      data,
+      message: 'Request completed successfully'
+    };
   } catch (error) {
-    console.error('API request error:', error);
-    throw new Error('Failed to connect to the server. Please try again later.');
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    // Handle network errors or other failures
+    throw new ApiError(
+      'Unable to connect to the server. Please check your internet connection and try again.',
+      'NETWORK_ERROR'
+    );
   }
 };
 

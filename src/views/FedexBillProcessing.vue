@@ -137,17 +137,18 @@ export default {
         
         const result = await uploadFedExBill(file);
         
-        if (result.status === 'success') {
-          this.$toast.success(result.message || 'File uploaded successfully');
+        if (result.success) {
+          this.$toast.success(result.message);
           
-          // Since we can't get the response data in no-cors mode,
-          // we'll show a message to the user
-          this.processedData = {
-            message: 'File has been uploaded and is being processed. Please check your email for results.'
-          };
+          if (result.data) {
+            this.processedData = result.data;
+          } else {
+            // For opaque responses where we don't get actual data
+            this.processedData = {
+              message: result.message
+            };
+          }
         }
-        
-        return result;
       } catch (error) {
         console.error('Error processing file:', error);
         this.error = error.message;
