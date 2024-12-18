@@ -9,17 +9,6 @@ export const API_ENDPOINTS = {
   CLEANUP_FILES: '/api/files/cleanup'
 }
 
-/**
- * Custom error class for API errors
- */
-class ApiError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-  }
-}
-
 // Helper function for API calls
 export const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -46,28 +35,41 @@ export const apiRequest = async (endpoint, options = {}) => {
     delete fetchOptions.headers['Content-Type'];
   }
 
+  let response;
   try {
-    const response = await fetch(url, fetchOptions);
+    response = await fetch(url, fetchOptions);
+  } catch (error) {
+    console.error('Network error:', error);
+    return {
+      success: false,
+      message: 'Unable to connect to the server. Please check your internet connection and try again.'
+    };
+  }
+
+  // Handle opaque response from no-cors mode
+  if (response.type === 'opaque') {
+    return { 
+      success: true,
+      message: 'File uploaded successfully. Please check your email for results.'
+    };
+  }
+
+  // Handle error responses
+  if (!response.ok) {
+    let message = 'An error occurred while processing your request.';
     
-    // Handle opaque response from no-cors mode
-    if (response.type === 'opaque') {
-      return { 
-        success: true,
-        message: 'File uploaded successfully. Please check your email for results.'
-      };
+    if (response.status === 502) {
+      message = 'The server is currently unavailable. Please try again later.';
     }
+    
+    return {
+      success: false,
+      message,
+      status: response.status
+    };
+  }
 
-    // Handle error responses
-    if (!response.ok) {
-      let errorMessage = 'An error occurred while processing your request.';
-      
-      if (response.status === 502) {
-        errorMessage = 'The server is currently unavailable. Please try again later.';
-      }
-      
-      throw new ApiError(errorMessage, response.status);
-    }
-
+  try {
     const data = await response.json();
     return {
       success: true,
@@ -75,15 +77,10 @@ export const apiRequest = async (endpoint, options = {}) => {
       message: 'Request completed successfully'
     };
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    
-    // Handle network errors or other failures
-    throw new ApiError(
-      'Unable to connect to the server. Please check your internet connection and try again.',
-      'NETWORK_ERROR'
-    );
+    return {
+      success: false,
+      message: 'Invalid response from server'
+    };
   }
 };
 

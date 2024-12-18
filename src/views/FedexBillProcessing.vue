@@ -143,15 +143,17 @@ export default {
           if (result.data) {
             this.processedData = result.data;
           } else {
-            // For opaque responses where we don't get actual data
             this.processedData = {
               message: result.message
             };
           }
+        } else {
+          this.error = result.message;
+          this.$toast.error(this.error);
         }
       } catch (error) {
-        console.error('Error processing file:', error);
-        this.error = error.message;
+        console.error('Unexpected error:', error);
+        this.error = 'An unexpected error occurred';
         this.$toast.error(this.error);
       } finally {
         this.loading = false;
