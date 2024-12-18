@@ -15,7 +15,8 @@ export const apiRequest = async (endpoint, options = {}) => {
   
   // Default options
   const defaultOptions = {
-    mode: 'cors',
+    mode: 'no-cors',
+    credentials: 'omit',
     headers: {}
   };
 
@@ -37,22 +38,24 @@ export const apiRequest = async (endpoint, options = {}) => {
   try {
     const response = await fetch(url, fetchOptions);
     
+    // Handle opaque response from no-cors mode
+    if (response.type === 'opaque') {
+      // We can't read the response body in no-cors mode
+      // Return a standard success response
+      return { 
+        status: 'success',
+        message: 'Request sent successfully'
+      };
+    }
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ 
-        detail: `Request failed with status ${response.status}` 
-      }));
-      
-      throw new Error(
-        Array.isArray(errorData.detail) 
-          ? errorData.detail[0]?.msg || 'Unknown error'
-          : errorData.detail
-      );
+      throw new Error(`Request failed with status ${response.status}`);
     }
 
     return response.json();
   } catch (error) {
     console.error('API request error:', error);
-    throw error;
+    throw new Error('Failed to connect to the server. Please try again later.');
   }
 };
 

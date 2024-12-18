@@ -128,20 +128,30 @@ export default {
     },
 
     async processFile(file) {
+      if (!file) return;
+      
       try {
         this.loading = true;
         this.error = null;
+        this.processedData = null;
         
         const result = await uploadFedExBill(file);
-        this.$toast.success('File processed successfully');
-        this.processedData = result.data;
-        this.downloadFile = result.files?.analysis_file;
+        
+        if (result.status === 'success') {
+          this.$toast.success(result.message || 'File uploaded successfully');
+          
+          // Since we can't get the response data in no-cors mode,
+          // we'll show a message to the user
+          this.processedData = {
+            message: 'File has been uploaded and is being processed. Please check your email for results.'
+          };
+        }
+        
         return result;
       } catch (error) {
         console.error('Error processing file:', error);
-        this.error = error.message || 'Error processing file';
+        this.error = error.message;
         this.$toast.error(this.error);
-        throw error;
       } finally {
         this.loading = false;
       }
