@@ -9,6 +9,20 @@ export const API_ENDPOINTS = {
   CLEANUP_FILES: '/api/files/cleanup'
 }
 
+// Default error response
+const createErrorResponse = (message = 'An error occurred') => ({
+  success: false,
+  message,
+  data: null
+});
+
+// Default success response
+const createSuccessResponse = (data = null, message = 'Operation completed successfully') => ({
+  success: true,
+  message,
+  data
+});
+
 // Helper function for API calls
 export const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -35,57 +49,47 @@ export const apiRequest = async (endpoint, options = {}) => {
     delete fetchOptions.headers['Content-Type'];
   }
 
-  let response;
   try {
-    response = await fetch(url, fetchOptions);
+    const response = await fetch(url, fetchOptions);
+    
+    // Handle opaque response from no-cors mode
+    if (response.type === 'opaque') {
+      return createSuccessResponse(
+        null, 
+        'File uploaded successfully. Please check your email for results.'
+      );
+    }
+
+    // Handle error responses
+    if (!response.ok) {
+      const message = response.status === 502
+        ? 'The server is currently unavailable. Please try again later.'
+        : 'An error occurred while processing your request.';
+      
+      return createErrorResponse(message);
+    }
+
+    // Try to parse JSON response
+    try {
+      const data = await response.json();
+      return createSuccessResponse(data);
+    } catch (error) {
+      return createErrorResponse('Invalid response from server');
+    }
   } catch (error) {
     console.error('Network error:', error);
-    return {
-      success: false,
-      message: 'Unable to connect to the server. Please check your internet connection and try again.'
-    };
-  }
-
-  // Handle opaque response from no-cors mode
-  if (response.type === 'opaque') {
-    return { 
-      success: true,
-      message: 'File uploaded successfully. Please check your email for results.'
-    };
-  }
-
-  // Handle error responses
-  if (!response.ok) {
-    let message = 'An error occurred while processing your request.';
-    
-    if (response.status === 502) {
-      message = 'The server is currently unavailable. Please try again later.';
-    }
-    
-    return {
-      success: false,
-      message,
-      status: response.status
-    };
-  }
-
-  try {
-    const data = await response.json();
-    return {
-      success: true,
-      data,
-      message: 'Request completed successfully'
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Invalid response from server'
-    };
+    return createErrorResponse(
+      'Unable to connect to the server. Please check your internet connection and try again.'
+    );
   }
 };
 
 // File upload helper
 export const uploadFedExBill = async (file) => {
+  if (!file) {
+    return createErrorResponse('No file selected');
+  }
+
   const formData = new FormData();
   formData.append('file', file, file.name);
 
