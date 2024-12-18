@@ -17,28 +17,32 @@ export const createApiRequest = async (endpoint, options = {}) => {
   const url = getApiUrl(endpoint);
   
   const defaultOptions = {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    mode: 'cors',
+    headers: options.body instanceof FormData 
+      ? {} // No headers for FormData
+      : {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
     ...options,
   };
 
-  // Don't set Content-Type for FormData (file uploads)
-  if (options.body instanceof FormData) {
-    delete defaultOptions.headers['Content-Type'];
-  }
-
-  const response = await fetch(url, defaultOptions);
-  
-  if (!response.ok) {
-    try {
-      const error = await response.json();
-      throw new Error(error.detail || 'API request failed');
-    } catch (e) {
-      throw new Error(`API request failed with status ${response.status}`);
+  try {
+    const response = await fetch(url, defaultOptions);
+    
+    if (!response.ok) {
+      const errorMessage = `Request failed with status ${response.status}`;
+      throw new Error(errorMessage);
     }
+    
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    }
+    
+    return { status: 'success' };
+  } catch (error) {
+    console.error('API Request Error:', error);
+    throw error;
   }
-  
-  return response.json();
 }
