@@ -130,34 +130,22 @@ export default {
     async processFile() {
       if (!this.selectedFile) return
 
-      console.log('API URL:', getApiUrl(API_ENDPOINTS.PROCESS_FEDEX_BILL))
-
       this.isProcessing = true
       this.error = null
       this.processedData = null
+      this.downloadFile = null
 
       const formData = new FormData()
-      formData.append('file', this.selectedFile)
+      formData.append('file', this.selectedFile, this.selectedFile.name)
 
       try {
-        const response = await createApiRequest(API_ENDPOINTS.PROCESS_FEDEX_BILL, {
+        const result = await createApiRequest(API_ENDPOINTS.PROCESS_FEDEX_BILL, {
           method: 'POST',
           body: formData
         })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.detail || 'Failed to process file')
-        }
-
-        const result = await response.json()
         
-        if (result.status === 'success') {
-          this.processedData = result.data
-          this.downloadFile = result.files.analysis_file
-        } else {
-          throw new Error(result.error || 'Processing failed')
-        }
+        this.processedData = result.data
+        this.downloadFile = result.files?.analysis_file
 
       } catch (error) {
         console.error('Error processing file:', error)
