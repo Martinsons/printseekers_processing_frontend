@@ -137,11 +137,22 @@ export default {
 
       try {
         const result = await uploadFedExBill(this.selectedFile)
-        this.processedData = result.data
-        this.downloadFile = result.files?.analysis_file
+        
+        // Handle opaque response
+        if (result.status === 'success' && !result.data) {
+          // If we get an opaque response, show a message to check the backend
+          this.error = 'File uploaded. Please check the backend for processing status.'
+          return
+        }
+
+        // Handle normal response
+        if (result.data) {
+          this.processedData = result.data
+          this.downloadFile = result.files?.analysis_file
+        }
       } catch (error) {
         console.error('Error processing file:', error)
-        this.error = error.message
+        this.error = error.message || 'Failed to process file'
       } finally {
         this.isProcessing = false
       }
