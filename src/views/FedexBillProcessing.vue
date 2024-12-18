@@ -92,7 +92,7 @@
 </template>
 
 <script>
-import { createApiRequest, API_ENDPOINTS, getApiUrl } from '../config/api'
+import { uploadFedExBill } from '../config/api'
 
 export default {
   name: 'FedexBillProcessing',
@@ -116,7 +116,6 @@ export default {
   methods: {
     handleFileSelect(event) {
       const file = event.target.files[0]
-      this.error = null
       
       if (file && !file.name.toLowerCase().endsWith('.pdf')) {
         this.error = 'Please select a PDF file'
@@ -125,6 +124,7 @@ export default {
       }
       
       this.selectedFile = file
+      this.error = null
     },
 
     async processFile() {
@@ -135,18 +135,10 @@ export default {
       this.processedData = null
       this.downloadFile = null
 
-      const formData = new FormData()
-      formData.append('file', this.selectedFile, this.selectedFile.name)
-
       try {
-        const result = await createApiRequest(API_ENDPOINTS.PROCESS_FEDEX_BILL, {
-          method: 'POST',
-          body: formData
-        })
-        
+        const result = await uploadFedExBill(this.selectedFile)
         this.processedData = result.data
         this.downloadFile = result.files?.analysis_file
-
       } catch (error) {
         console.error('Error processing file:', error)
         this.error = error.message
@@ -159,7 +151,7 @@ export default {
       if (!this.downloadFile) return
 
       try {
-        const response = await createApiRequest(API_ENDPOINTS.DOWNLOAD(this.downloadFile))
+        const response = await fetch(this.downloadFile)
         if (!response.ok) {
           const errorData = await response.json().catch(() => null)
           throw new Error(errorData?.detail || `Download failed with status: ${response.status}`)

@@ -1,5 +1,5 @@
 // API base URL configuration
-export const API_BASE_URL = 'https://web-production-33796.up.railway.app'
+const API_BASE_URL = 'https://web-production-33796.up.railway.app';
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -9,40 +9,43 @@ export const API_ENDPOINTS = {
   CLEANUP_FILES: '/api/files/cleanup'
 }
 
-// Helper function to construct full API URLs
-export const getApiUrl = (endpoint) => `${API_BASE_URL}${endpoint}`
-
-// API request configuration
-export const createApiRequest = async (endpoint, options = {}) => {
-  const url = getApiUrl(endpoint);
+// Helper function for API calls
+export const apiRequest = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
   
   const defaultOptions = {
     mode: 'cors',
-    headers: options.body instanceof FormData 
-      ? {} // No headers for FormData
-      : {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-    ...options,
+    headers: {
+      'Accept': 'application/json',
+      ...options.headers,
+    },
   };
 
+  // For file uploads, don't set Content-Type header
+  if (!(options.body instanceof FormData)) {
+    defaultOptions.headers['Content-Type'] = 'application/json';
+  }
+
   try {
-    const response = await fetch(url, defaultOptions);
-    
+    const response = await fetch(url, { ...defaultOptions, ...options });
     if (!response.ok) {
-      const errorMessage = `Request failed with status ${response.status}`;
-      throw new Error(errorMessage);
+      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(errorData.detail || `Request failed with status ${response.status}`);
     }
-    
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return response.json();
-    }
-    
-    return { status: 'success' };
+    return response.json();
   } catch (error) {
-    console.error('API Request Error:', error);
+    console.error('API request error:', error);
     throw error;
   }
-}
+};
+
+// Specific API functions
+export const uploadFedExBill = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return apiRequest(API_ENDPOINTS.PROCESS_FEDEX_BILL, {
+    method: 'POST',
+    body: formData
+  });
+};
