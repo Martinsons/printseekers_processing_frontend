@@ -130,6 +130,8 @@ export default {
     async processFile() {
       if (!this.selectedFile) return
 
+      console.log('API URL:', getApiUrl(API_ENDPOINTS.PROCESS_FEDEX_BILL))
+
       this.isProcessing = true
       this.error = null
       this.processedData = null
