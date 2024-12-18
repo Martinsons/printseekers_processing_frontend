@@ -89,11 +89,10 @@
 
         <!-- Status Message -->
         <div 
-          v-if="status" 
-          class="mb-4 p-4 rounded-lg"
-          :class="statusClass"
+          v-if="error" 
+          class="mb-4 p-4 rounded-lg bg-red-50 text-red-800"
         >
-          {{ statusMessage }}
+          {{ error }}
         </div>
 
         <!-- Files List -->
@@ -182,31 +181,23 @@
 </template>
 
 <script>
-import { createApiRequest, API_ENDPOINTS } from '../config/api'
+import { apiRequest, API_ENDPOINTS } from '../config/api'
 
 export default {
   data() {
     return {
       files: [],
       isDownloading: false,
-      status: null,
-      statusMessage: '',
-      downloadProgress: 0,
-      totalFiles: 0
-    }
-  },
-
-  computed: {
-    statusClass() {
-      return {
-        'bg-green-50 text-green-800': this.status === 'success',
-        'bg-red-50 text-red-800': this.status === 'error'
-      }
+      error: null,
+      cleanupInterval: null
     }
   },
 
   created() {
-    
+    // Start periodic cleanup check
+    this.cleanupInterval = setInterval(this.cleanupFiles, 300000) // 5 minutes
+    this.cleanupFiles() // Initial cleanup
+
     const storedFiles = localStorage.getItem('processedFiles')
     
     if (storedFiles) {
@@ -216,7 +207,7 @@ export default {
   },
 
   unmounted() {
-    this.cleanupFiles()
+    if (this.cleanupInterval) clearInterval(this.cleanupInterval)
   },
 
   methods: {
@@ -264,24 +255,16 @@ export default {
 
     async downloadAllFiles() {
       if (this.isDownloading) return
-      
       this.isDownloading = true
-      this.status = 'success'
-      this.statusMessage = 'Starting downloads...'
-      this.totalFiles = this.files.length
-      this.downloadProgress = 0
-      
+      this.error = null
+
       try {
         for (const file of this.files) {
           await this.downloadFile(file)
-          this.downloadProgress++
-          this.statusMessage = `Downloading files (${this.downloadProgress}/${this.totalFiles})`
         }
-        this.statusMessage = 'Visi faili lejupielādēti veiksmīgi'
       } catch (error) {
         console.error('Error downloading files:', error)
-        this.status = 'error'
-        this.statusMessage = 'Failed to download some files'
+        this.error = error.message
       } finally {
         this.isDownloading = false
       }
@@ -289,47 +272,34 @@ export default {
 
     async downloadFile(file) {
       try {
-        const filePath = file.path.replace('processed_files/', '')
-        const response = await createApiRequest(API_ENDPOINTS.DOWNLOAD(filePath))
-        
-        if (!response.ok) {
-          throw new Error('Failed to download file')
-        }
-        
+        const response = await fetch(file.download_url)
+        if (!response.ok) throw new Error(`Download failed: ${response.status}`)
+
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = file.name
+        a.download = this.getFileName(file.path)
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
       } catch (error) {
         console.error('Error downloading file:', error)
-        throw error
+        throw new Error(`Failed to download ${this.getFileName(file.path)}`)
       }
     },
 
     async cleanupFiles() {
       try {
-        const response = await createApiRequest(API_ENDPOINTS.CLEANUP_FILES, {
+        const result = await apiRequest(API_ENDPOINTS.CLEANUP_FILES, {
           method: 'POST'
         })
-        
-        if (!response.ok) {
-          console.error('Failed to cleanup files')
-        } 
+        console.log('Cleanup result:', result)
       } catch (error) {
         console.error('Error cleaning up files:', error)
       }
-    }
-  },
-
-  beforeRouteLeave(to, from, next) {
-    // Ensure cleanup happens before navigation
-    this.cleanupFiles()
-    next()
+    },
   }
 }
 </script>
