@@ -378,6 +378,7 @@
 import * as XLSX from 'xlsx';
 import { supabaseDb } from '../config/supabase';
 import { useToast } from 'vue-toastification';
+import { apiRequest, API_ENDPOINTS } from '../config/api';
 
 export default {
   name: 'ShippingCostComparison',
@@ -570,37 +571,41 @@ export default {
       formData.append('file', this.selectedFile);
 
       try {
-        const response = await fetch('http://localhost:8000/api/compare-shipping-costs', {
+        const result = await apiRequest(API_ENDPOINTS.COMPARE_SHIPPING_COSTS, {
           method: 'POST',
           body: formData
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to process file');
+        if (!result) {
+          throw new Error('No response received from server');
         }
 
-        const data = await response.json();
-        if (data.status === 'success') {
-          this.results = this.processResults(data.comparisons.map(item => ({
-            ...item,
-            senderContactName: item.senderContactName || 'N/A',
-            serviceType: item.serviceType || 'N/A',
-            excelDimensions: item.excelDimensions || 'N/A',
-            dimensions: item.dimensions || 'N/A',
-            recipientCountry: item.recipientCountry || 'N/A',
-            productType: item.productType || 'N/A',
-            productCategory: item.productCategory || 'N/A',
-            recipient: item.recipient || 'N/A',
-            serviceData: item.serviceData || 'N/A',
-            deliveryZone: item.deliveryZone || 'N/A'
-          })));
+        if (result.success) {
+          if (result.data && result.data.comparisons) {
+            this.results = this.processResults(result.data.comparisons.map(item => ({
+              ...item,
+              senderContactName: item.senderContactName || 'N/A',
+              serviceType: item.serviceType || 'N/A',
+              excelDimensions: item.excelDimensions || 'N/A',
+              dimensions: item.dimensions || 'N/A',
+              recipientCountry: item.recipientCountry || 'N/A',
+              productType: item.productType || 'N/A',
+              productCategory: item.productCategory || 'N/A',
+              recipient: item.recipient || 'N/A',
+              serviceData: item.serviceData || 'N/A',
+              deliveryZone: item.deliveryZone || 'N/A'
+            })));
+            this.$toast?.success('File processed successfully');
+          } else {
+            throw new Error('Invalid response format from server');
+          }
         } else {
-          throw new Error(data.error || 'Failed to process file');
+          throw new Error(result.message || 'Failed to process file');
         }
-      } catch (err) {
-        this.error = err.message;
-        console.error('Error:', err);
+      } catch (error) {
+        console.error('Error processing file:', error);
+        this.error = error.message;
+        this.$toast?.error(this.error);
       } finally {
         this.isLoading = false;
         this.isProcessing = false;
