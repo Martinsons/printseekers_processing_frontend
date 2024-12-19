@@ -92,7 +92,7 @@
 </template>
 
 <script>
-import { uploadFedExBill } from '../config/api'
+import { uploadFedExBill, apiRequest } from '../config/api'
 
 export default {
   name: 'FedexBillProcessing',
@@ -171,24 +171,30 @@ export default {
       if (!this.downloadFile) return
 
       try {
-        const response = await fetch(this.downloadFile)
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null)
-          throw new Error(errorData?.detail || `Download failed with status: ${response.status}`)
+        const result = await apiRequest(this.downloadFile, {
+          method: 'GET',
+          responseType: 'blob'
+        });
+
+        if (!result) {
+          throw new Error('Failed to download file');
         }
 
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = this.downloadFile.split('/').pop()
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
+        const blob = new Blob([result], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = this.downloadFile.split('/').pop();
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        this.$toast?.success('File downloaded successfully');
       } catch (error) {
-        console.error('Error downloading file:', error)
-        this.error = error.message || 'Failed to download file'
+        console.error('Error downloading file:', error);
+        const errorMessage = error.message || 'Failed to download file';
+        this.error = errorMessage;
+        this.$toast?.error(errorMessage);
       }
     }
   }
