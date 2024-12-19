@@ -137,24 +137,30 @@ export default {
         
         const result = await uploadFedExBill(file);
         
+        if (!result) {
+          throw new Error('No response received from server');
+        }
+
         if (result.success) {
-          this.$toast.success(result.message);
+          this.$toast.success(result.message || 'File processed successfully');
           
           if (result.data) {
             this.processedData = result.data;
           } else {
             this.processedData = {
-              message: result.message
+              message: result.message || 'File processed successfully'
             };
           }
         } else {
-          this.error = result.message;
-          this.$toast.error(this.error);
+          const errorMessage = result.message || 'Failed to process file';
+          this.error = errorMessage;
+          this.$toast.error(errorMessage);
         }
       } catch (error) {
         console.error('Unexpected error:', error);
-        this.error = 'An unexpected error occurred';
-        this.$toast.error(this.error);
+        const errorMessage = error.message || 'An unexpected error occurred';
+        this.error = errorMessage;
+        this.$toast.error(errorMessage);
       } finally {
         this.loading = false;
       }
