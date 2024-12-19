@@ -439,6 +439,12 @@ const fetchInvoiceNumbers = async () => {
       .order('invoice_number')
 
     if (fetchError) throw fetchError
+    
+    // Debug logging
+    console.log('Raw data from database:', data);
+    console.log('Unique invoice numbers:', [...new Set(data.map(r => r.invoice_number))]);
+    console.log('Non-null invoice numbers:', data.map(r => r.invoice_number).filter(Boolean));
+    
     availableInvoices.value = [...new Set(data.map(r => r.invoice_number).filter(Boolean))]
   } catch (err) {
     console.error('Error fetching invoice numbers:', err)
