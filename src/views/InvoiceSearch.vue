@@ -433,21 +433,36 @@ const hasResults = computed(() => invoiceResults.value.length > 0)
 const fetchInvoiceNumbers = async () => {
   try {
     isLoadingInvoices.value = true
-    const { data, error: fetchError } = await supabaseDb
-      .from('invoice_records')
-      .select('invoice_number')
-      .order('invoice_number')
+    let allInvoiceNumbers = []
+    let hasMore = true
+    let page = 0
+    const pageSize = 1000
 
-    if (fetchError) throw fetchError
-    
-    // Debug logging
-    console.log('Raw data from database:', data);
-    console.log('Unique invoice numbers:', [...new Set(data.map(r => r.invoice_number))]);
-    console.log('Non-null invoice numbers:', data.map(r => r.invoice_number).filter(Boolean));
-    
-    availableInvoices.value = [...new Set(data.map(r => r.invoice_number).filter(Boolean))]
+    while (hasMore) {
+      const { data, error: fetchError, count } = await supabaseDb
+        .from('invoice_records')
+        .select('invoice_number', { count: 'exact' })
+        .order('invoice_number')
+        .range(page * pageSize, (page + 1) * pageSize - 1)
+
+      if (fetchError) throw fetchError
+
+      if (!data || data.length === 0) {
+        hasMore = false
+      } else {
+        allInvoiceNumbers = [...allInvoiceNumbers, ...data]
+        page++
+        
+        // Check if we've fetched all records
+        hasMore = allInvoiceNumbers.length < count
+      }
+    }
+
+    // Set the available invoices with unique, non-null values
+    availableInvoices.value = [...new Set(allInvoiceNumbers.map(r => r.invoice_number).filter(Boolean))]
   } catch (err) {
     console.error('Error fetching invoice numbers:', err)
+    error.value = 'Failed to fetch invoice numbers: ' + err.message
   } finally {
     isLoadingInvoices.value = false
   }
