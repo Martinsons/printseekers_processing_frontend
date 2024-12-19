@@ -137,8 +137,11 @@ export default {
         
         const result = await uploadFedExBill(file);
         
+        // Handle the case where result is undefined (network error)
         if (!result) {
-          throw new Error('No response received from server');
+          this.error = 'Network error: Unable to connect to the server';
+          this.$toast.error(this.error);
+          return;
         }
 
         if (result.success) {
@@ -152,15 +155,13 @@ export default {
             };
           }
         } else {
-          const errorMessage = result.message || 'Failed to process file';
-          this.error = errorMessage;
-          this.$toast.error(errorMessage);
+          this.error = result.message || 'Failed to process file';
+          this.$toast.error(this.error);
         }
       } catch (error) {
         console.error('Unexpected error:', error);
-        const errorMessage = error.message || 'An unexpected error occurred';
-        this.error = errorMessage;
-        this.$toast.error(errorMessage);
+        this.error = error?.message || 'An unexpected error occurred';
+        this.$toast.error(this.error);
       } finally {
         this.loading = false;
       }

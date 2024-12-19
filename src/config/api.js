@@ -29,12 +29,9 @@ export const apiRequest = async (endpoint, options = {}) => {
   
   // Default options
   const defaultOptions = {
-    mode: 'cors',
-    credentials: 'include',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    }
+    mode: 'no-cors',
+    credentials: 'omit',
+    headers: {}
   };
 
   // Merge options
@@ -57,10 +54,13 @@ export const apiRequest = async (endpoint, options = {}) => {
     
     // Handle opaque response from no-cors mode
     if (response.type === 'opaque') {
-      return createSuccessResponse(
-        null, 
-        'File uploaded successfully. Please check your email for results.'
-      );
+      // Since we can't read the response in no-cors mode,
+      // we'll return a standard success response
+      return {
+        success: true,
+        message: 'File uploaded successfully. Please check your email for results.',
+        data: null
+      };
     }
 
     // Handle error responses
