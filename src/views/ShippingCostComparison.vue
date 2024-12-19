@@ -606,7 +606,14 @@ export default {
         }
       } catch (error) {
         console.error('Error processing file:', error);
-        this.error = error.message;
+        // Handle specific error cases
+        let errorMessage = error.message;
+        if (error.message.includes('503')) {
+          errorMessage = 'The service is temporarily unavailable. Please try again in a few minutes.';
+        } else if (error.message.includes('502')) {
+          errorMessage = 'The server is currently unavailable. Please try again later.';
+        }
+        this.error = errorMessage;
         this.$toast?.error(this.error);
       } finally {
         this.isLoading = false;
