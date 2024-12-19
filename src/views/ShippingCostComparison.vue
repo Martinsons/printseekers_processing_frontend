@@ -580,25 +580,27 @@ export default {
           throw new Error('No response received from server');
         }
 
-        if (result.success) {
-          if (result.data && result.data.comparisons) {
-            this.results = this.processResults(result.data.comparisons.map(item => ({
-              ...item,
-              senderContactName: item.senderContactName || 'N/A',
-              serviceType: item.serviceType || 'N/A',
-              excelDimensions: item.excelDimensions || 'N/A',
-              dimensions: item.dimensions || 'N/A',
-              recipientCountry: item.recipientCountry || 'N/A',
-              productType: item.productType || 'N/A',
-              productCategory: item.productCategory || 'N/A',
-              recipient: item.recipient || 'N/A',
-              serviceData: item.serviceData || 'N/A',
-              deliveryZone: item.deliveryZone || 'N/A'
-            })));
-            this.$toast?.success('File processed successfully');
-          } else {
-            throw new Error('Invalid response format from server');
-          }
+        // For opaque responses in no-cors mode, we'll show a message to check email
+        if (result.success && !result.data) {
+          this.$toast?.success('File uploaded successfully. Please check your email for results.');
+          return;
+        }
+
+        if (result.success && result.data && result.data.comparisons) {
+          this.results = this.processResults(result.data.comparisons.map(item => ({
+            ...item,
+            senderContactName: item.senderContactName || 'N/A',
+            serviceType: item.serviceType || 'N/A',
+            excelDimensions: item.excelDimensions || 'N/A',
+            dimensions: item.dimensions || 'N/A',
+            recipientCountry: item.recipientCountry || 'N/A',
+            productType: item.productType || 'N/A',
+            productCategory: item.productCategory || 'N/A',
+            recipient: item.recipient || 'N/A',
+            serviceData: item.serviceData || 'N/A',
+            deliveryZone: item.deliveryZone || 'N/A'
+          })));
+          this.$toast?.success('File processed successfully');
         } else {
           throw new Error(result.message || 'Failed to process file');
         }
