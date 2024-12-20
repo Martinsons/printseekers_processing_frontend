@@ -1,5 +1,5 @@
 // API base URL
-const API_BASE_URL = 'https://web-production-33796.up.railway.app';
+const API_BASE_URL = 'https://printseekers-backend.onrender.com';
 
 // API endpoints
 export const API_ENDPOINTS = {
