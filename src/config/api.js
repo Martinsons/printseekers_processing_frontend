@@ -50,24 +50,24 @@ export const apiRequest = async (endpoint, options = {}) => {
   }
 
   try {
+    console.log('Making request to:', url);
     const response = await fetch(url, fetchOptions);
+    console.log('Response received:', response);
     
     // Handle opaque response from no-cors mode
     if (response.type === 'opaque') {
+      console.log('Received opaque response');
       // Since we can't read the response in no-cors mode,
       // we'll return a standard success response
-      return {
-        success: true,
-        message: 'File uploaded successfully. Please check your email for results.',
-        data: null
-      };
+      return createSuccessResponse(null, 'File uploaded successfully. Please check your email for results.');
     }
 
     // Handle error responses
     if (!response.ok) {
+      console.log('Response not OK:', response.status);
       const message = response.status === 502
         ? 'The server is currently unavailable. Please try again later.'
-        : 'An error occurred while processing your request.';
+        : `Request failed with status: ${response.status}`;
       
       return createErrorResponse(message);
     }
@@ -75,8 +75,10 @@ export const apiRequest = async (endpoint, options = {}) => {
     // Try to parse JSON response
     try {
       const data = await response.json();
+      console.log('Parsed response data:', data);
       return createSuccessResponse(data);
     } catch (error) {
+      console.error('Error parsing JSON:', error);
       return createErrorResponse('Invalid response from server');
     }
   } catch (error) {

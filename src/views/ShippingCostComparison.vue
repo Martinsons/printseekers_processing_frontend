@@ -576,6 +576,8 @@ export default {
           body: formData
         });
 
+        console.log('API Response:', result);
+
         if (!result) {
           throw new Error('No response received from server');
         }
@@ -586,8 +588,21 @@ export default {
           return;
         }
 
-        if (result.success && result.data && result.data.comparisons) {
-          this.results = this.processResults(result.data.comparisons.map(item => ({
+        if (result.success) {
+          console.log('Processing data:', result.data);
+          let comparisonsData = result.data;
+          
+          // Handle both possible response formats
+          if (result.data.comparisons) {
+            comparisonsData = result.data.comparisons;
+          }
+          
+          if (!Array.isArray(comparisonsData)) {
+            console.error('Comparisons data is not an array:', comparisonsData);
+            throw new Error('Invalid data format received from server');
+          }
+
+          this.results = this.processResults(comparisonsData.map(item => ({
             ...item,
             senderContactName: item.senderContactName || 'N/A',
             serviceType: item.serviceType || 'N/A',
@@ -600,6 +615,8 @@ export default {
             serviceData: item.serviceData || 'N/A',
             deliveryZone: item.deliveryZone || 'N/A'
           })));
+          
+          console.log('Processed results:', this.results);
           this.$toast?.success('File processed successfully');
         } else {
           throw new Error(result.message || 'Failed to process file');
@@ -622,7 +639,8 @@ export default {
     },
 
     processResults(data) {
-      return data.map(item => {
+      console.log('Processing raw data:', data);
+      const processed = data.map(item => {
         const excelCost = parseFloat(item.excelCost);
         const databaseCost = parseFloat(item.databaseCost);
         let costDifference = 'N/A';
@@ -632,25 +650,29 @@ export default {
           costDifference = Math.abs(diff) < 0.01 ? 'OK' : diff.toFixed(2);
         }
 
-        return {
-          invoice: item.invoice,
-          trackingNumber: item.trackingNumber,
-          recipient: item.recipient,
-          senderContactName: item.senderContactName,
-          excelCost: item.excelCost,
-          databaseCost: item.databaseCost,
+        const result = {
+          invoice: item.invoice || 'N/A',
+          trackingNumber: item.trackingNumber || 'N/A',
+          recipient: item.recipient || 'N/A',
+          senderContactName: item.senderContactName || 'N/A',
+          excelCost: item.excelCost || 'N/A',
+          databaseCost: item.databaseCost || 'N/A',
           costDifference,
           status: this.getStatus(item),
-          recipientCountry: item.recipientCountry,
-          dimensions: item.dimensions,
-          excelDimensions: item.excelDimensions,
-          productType: item.productType,
-          productCategory: item.productCategory,
-          serviceType: item.serviceType,
-          serviceData: item.serviceData,
-          deliveryZone: item.deliveryZone
+          recipientCountry: item.recipientCountry || 'N/A',
+          dimensions: item.dimensions || 'N/A',
+          excelDimensions: item.excelDimensions || 'N/A',
+          productType: item.productType || 'N/A',
+          productCategory: item.productCategory || 'N/A',
+          serviceType: item.serviceType || 'N/A',
+          serviceData: item.serviceData || 'N/A',
+          deliveryZone: item.deliveryZone || 'N/A'
         };
+        console.log('Processed item:', result);
+        return result;
       });
+      console.log('Final processed data:', processed);
+      return processed;
     },
 
     formatCost(cost) {

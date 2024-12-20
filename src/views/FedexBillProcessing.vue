@@ -137,31 +137,32 @@ export default {
         
         const result = await uploadFedExBill(file);
         
+        console.log('API Response:', result);
+
         // Handle the case where result is undefined (network error)
         if (!result) {
           this.error = 'Network error: Unable to connect to the server';
-          this.$toast.error(this.error);
+          this.$toast?.error(this.error);
           return;
         }
 
-        if (result.success) {
-          this.$toast.success(result.message || 'File processed successfully');
-          
-          if (result.data) {
-            this.processedData = result.data;
-          } else {
-            this.processedData = {
-              message: result.message || 'File processed successfully'
-            };
-          }
+        // For opaque responses in no-cors mode
+        if (result.success && !result.data) {
+          this.$toast?.success(result.message || 'File processed successfully');
+          return;
+        }
+
+        if (result.success && result.data) {
+          this.processedData = result.data;
+          this.$toast?.success(result.message || 'File processed successfully');
         } else {
           this.error = result.message || 'Failed to process file';
-          this.$toast.error(this.error);
+          this.$toast?.error(this.error);
         }
       } catch (error) {
         console.error('Unexpected error:', error);
         this.error = error?.message || 'An unexpected error occurred';
-        this.$toast.error(this.error);
+        this.$toast?.error(this.error);
       } finally {
         this.loading = false;
       }
