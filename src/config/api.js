@@ -29,9 +29,12 @@ export const apiRequest = async (endpoint, options = {}) => {
   
   // Default options
   const defaultOptions = {
-    mode: 'no-cors',
-    credentials: 'omit',
-    headers: {}
+    mode: 'cors',
+    credentials: 'include',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    }
   };
 
   // Merge options
