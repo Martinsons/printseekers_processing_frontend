@@ -573,6 +573,7 @@ export default {
       formData.append('file', this.selectedFile);
 
       try {
+        // Get first page of results
         const result = await apiRequest(API_ENDPOINTS.COMPARE_SHIPPING_COSTS, {
           method: 'POST',
           body: formData
@@ -589,18 +590,31 @@ export default {
           
           // Access the nested data
           const responseData = result.data;
-          const comparisonsData = responseData.data;
+          let allComparisons = [...responseData.data];
           
-          if (!Array.isArray(comparisonsData)) {
-            console.error('Invalid data format received from server:', comparisonsData);
-            throw new Error('Invalid data format received from server');
-          }
-
           // Store pagination and summary data
           this.pagination = responseData.pagination;
           this.summary = responseData.summary;
 
-          this.results = this.processResults(comparisonsData.map(item => ({
+          // Fetch remaining pages if any
+          if (this.pagination.totalPages > 1) {
+            for (let page = 2; page <= this.pagination.totalPages; page++) {
+              const nextPageResult = await apiRequest(`${API_ENDPOINTS.COMPARE_SHIPPING_COSTS}?page=${page}`, {
+                method: 'GET'
+              });
+              
+              if (nextPageResult.success && nextPageResult.data && Array.isArray(nextPageResult.data.data)) {
+                allComparisons = [...allComparisons, ...nextPageResult.data.data];
+              }
+            }
+          }
+
+          if (!Array.isArray(allComparisons)) {
+            console.error('Invalid data format received from server:', allComparisons);
+            throw new Error('Invalid data format received from server');
+          }
+
+          this.results = this.processResults(allComparisons.map(item => ({
             ...item,
             senderContactName: item.senderContactName || 'N/A',
             serviceType: item.serviceType || 'N/A',
