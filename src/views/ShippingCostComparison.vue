@@ -401,6 +401,8 @@ export default {
       currentFilter: 'all', 
       editingRecord: null,
       sortDirection: 'desc', // Add new sorting direction state
+      pagination: null,
+      summary: null,
       tableHeaders: [
         { key: 'invoice', label: 'Invoice' },
         { key: 'trackingNumber', label: 'Tracking Number' },
@@ -582,25 +584,20 @@ export default {
           throw new Error('No response received from server');
         }
 
-        // For opaque responses in no-cors mode, we'll show a message to check email
-        if (result.success && !result.data) {
-          this.$toast?.success('File uploaded successfully. Please check your email for results.');
-          return;
-        }
-
         if (result.success) {
           console.log('Processing data:', result.data);
-          let comparisonsData = result.data;
           
-          // Handle both possible response formats
-          if (result.data.comparisons) {
-            comparisonsData = result.data.comparisons;
-          }
+          // Access the data array directly
+          const comparisonsData = result.data;
           
           if (!Array.isArray(comparisonsData)) {
-            console.error('Comparisons data is not an array:', comparisonsData);
+            console.error('Invalid data format received from server:', comparisonsData);
             throw new Error('Invalid data format received from server');
           }
+
+          // Store pagination and summary data
+          this.pagination = result.pagination;
+          this.summary = result.summary;
 
           this.results = this.processResults(comparisonsData.map(item => ({
             ...item,
@@ -623,7 +620,6 @@ export default {
         }
       } catch (error) {
         console.error('Error processing file:', error);
-        // Handle specific error cases
         let errorMessage = error.message;
         if (error.message.includes('503')) {
           errorMessage = 'The service is temporarily unavailable. Please try again in a few minutes.';
