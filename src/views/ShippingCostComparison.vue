@@ -599,8 +599,14 @@ export default {
           // Fetch remaining pages if any
           if (this.pagination.totalPages > 1) {
             for (let page = 2; page <= this.pagination.totalPages; page++) {
-              const nextPageResult = await apiRequest(`${API_ENDPOINTS.COMPARE_SHIPPING_COSTS}?page=${page}`, {
-                method: 'GET'
+              // Create a new FormData for each page request
+              const pageFormData = new FormData();
+              pageFormData.append('file', this.selectedFile);
+              pageFormData.append('page', page.toString());
+              
+              const nextPageResult = await apiRequest(API_ENDPOINTS.COMPARE_SHIPPING_COSTS, {
+                method: 'POST',
+                body: pageFormData
               });
               
               if (nextPageResult.success && nextPageResult.data && Array.isArray(nextPageResult.data.data)) {
