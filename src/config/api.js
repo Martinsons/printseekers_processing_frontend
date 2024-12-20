@@ -1,5 +1,5 @@
 // API base URL
-const API_BASE_URL = 'https://printseekers-backend.onrender.com';
+const API_BASE_URL = 'https://printseekers-processing-backend.onrender.com';
 
 // API endpoints
 export const API_ENDPOINTS = {

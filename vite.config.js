@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://printseekers-backend.onrender.com',
+        target: 'https://printseekers-processing-backend.onrender.com',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path
