@@ -587,8 +587,9 @@ export default {
         if (result.success) {
           console.log('Processing data:', result.data);
           
-          // Access the data array directly
-          const comparisonsData = result.data;
+          // Access the nested data
+          const responseData = result.data;
+          const comparisonsData = responseData.data;
           
           if (!Array.isArray(comparisonsData)) {
             console.error('Invalid data format received from server:', comparisonsData);
@@ -596,8 +597,8 @@ export default {
           }
 
           // Store pagination and summary data
-          this.pagination = result.pagination;
-          this.summary = result.summary;
+          this.pagination = responseData.pagination;
+          this.summary = responseData.summary;
 
           this.results = this.processResults(comparisonsData.map(item => ({
             ...item,
