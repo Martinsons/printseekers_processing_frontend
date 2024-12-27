@@ -756,11 +756,14 @@ const updateField = async (updateData) => {
     
     const updates = {}
     
+    // Only update the specific field that changed
+    updates[updateData.fieldName] = updateData.value
+    
+    // Only update stage if fedex_return is being changed
     if (updateData.fieldName === 'fedex_return') {
       const record = invoiceResults.value.find(r => r.id === updateData.recordId)
       
       if (record) {
-        updates.fedex_return = updateData.value
         const fedexCost = parseFloat(record.fedex_cost) || 0
         const sentCost = parseFloat(record.sent_cost) || 0
         const costDifference = Math.abs(fedexCost - sentCost)
@@ -769,12 +772,7 @@ const updateField = async (updateData) => {
         // Mark as Finished if FedEx returned equal or more than the cost difference
         updates.stage = fedexReturn >= costDifference ? 'Finished' : 'Resend'
       }
-    } else {
-      // For all other updates, keep the existing stage
-      delete updates.stage
     }
-
-    updates[updateData.fieldName] = updateData.value
 
     const { data, error: updateError } = await supabaseDb
       .from('invoice_records')
@@ -813,31 +811,27 @@ const updateField = async (updateData) => {
   }
 }
 
-const clearSearch = async () => {
-  searchQuery.value = ''
-  selectedStatus.value = 'All Statuses'
-  additionalStatusFilter.value = ''
-  invoiceResults.value = []
-  error.value = null
-  hasSearched.value = false
-  selectedRows.value.clear()
-  
-  // Refresh invoice numbers after clearing
-  await refreshInvoiceNumbers()
-}
-
 const saveEditing = async () => {
   try {
     if (!editingRecord.value) return
     
     isSaving.value = true
     
-    // Get all the changed fields
-    const updates = {}
+    // Find the original record
+    const originalRecord = invoiceResults.value.find(r => r.id === editingRecord.value.id)
+    if (!originalRecord) return
     
-    // Only include fields that have been edited
-    if (editingRecord.value.fedex_return !== undefined) {
-      updates.fedex_return = editingRecord.value.fedex_return
+    // Get only the changed fields
+    const updates = {}
+    Object.keys(editingRecord.value).forEach(key => {
+      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' &&
+          editingRecord.value[key] !== originalRecord[key]) {
+        updates[key] = editingRecord.value[key]
+      }
+    })
+    
+    // Handle FedEx return and stage update
+    if ('fedex_return' in updates) {
       const fedexCost = parseFloat(editingRecord.value.fedex_cost) || 0
       const sentCost = parseFloat(editingRecord.value.sent_cost) || 0
       const costDifference = Math.abs(fedexCost - sentCost)
@@ -847,13 +841,13 @@ const saveEditing = async () => {
       updates.stage = fedexReturn >= costDifference ? 'Finished' : 'Resend'
     }
 
-    // Add other fields except stage, id, and timestamps
-    Object.keys(editingRecord.value).forEach(key => {
-      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && 
-          key !== 'stage' && key !== 'fedex_return') {
-        updates[key] = editingRecord.value[key]
-      }
-    })
+    // If no changes were made, return early
+    if (Object.keys(updates).length === 0) {
+      showSuccessMessage('No changes to save')
+      editingRecord.value = null
+      isSaving.value = false
+      return
+    }
 
     const { data, error: updateError } = await supabaseDb
       .from('invoice_records')
@@ -872,7 +866,7 @@ const saveEditing = async () => {
         }
         return record
       })
-      
+
       // Clear editing state immediately
       editingRecord.value = null
       const message = updates.stage 
