@@ -835,7 +835,7 @@ const saveEditing = async () => {
     // Get all the changed fields
     const updates = {}
     Object.keys(editingRecord.value).forEach(key => {
-      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at') {
+      if (key !== 'id' && key !== 'created_at' && key !== 'updated_at' && key !== 'stage') {
         updates[key] = editingRecord.value[key]
       }
     })
@@ -849,9 +849,6 @@ const saveEditing = async () => {
       
       // Mark as Finished if FedEx returned equal or more than the cost difference
       updates.stage = fedexReturn >= costDifference ? 'Finished' : 'Resend'
-    } else {
-      // For all other updates, keep the existing stage
-      delete updates.stage
     }
 
     const { data, error: updateError } = await supabaseDb
