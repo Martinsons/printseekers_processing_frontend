@@ -219,9 +219,8 @@
                       :key="header.key"
                       class="px-6 py-4 text-sm text-gray-900"
                       :class="{
-                        'min-w-[150px]': ['recipient', 'tracking_number', 'invoice_number'].includes(header.key),
-                        'min-w-[120px]': ['fedex_cost', 'sent_cost', 'cost_difference', 'fedex_return'].includes(header.key),
-                        'min-w-[100px]': ['country', 'dimensions', 'sent_dimensions'].includes(header.key),
+                        'text-right': header.type === 'currency',
+                        [getCostDifferenceClass(record[header.key])]: header.key === 'cost_difference'
                       }"
                     >
                       <!-- Status Select -->
@@ -764,10 +763,19 @@ const updateField = async (updateData) => {
     // Only update the specific field that changed
     updates[updateData.fieldName] = updateData.value
     
+    // If sent_cost is being updated, recalculate cost_difference
+    if (updateData.fieldName === 'sent_cost') {
+      const record = invoiceResults.value.find(r => r.id === updateData.recordId)
+      if (record) {
+        const fedexCost = parseFloat(record.fedex_cost) || 0
+        const sentCost = parseFloat(updateData.value) || 0
+        updates.cost_difference = Math.abs(fedexCost - sentCost).toFixed(2)
+      }
+    }
+    
     // Only update stage if fedex_return is being changed
     if (updateData.fieldName === 'fedex_return') {
       const record = invoiceResults.value.find(r => r.id === updateData.recordId)
-      
       if (record) {
         const fedexCost = parseFloat(record.fedex_cost) || 0
         const sentCost = parseFloat(record.sent_cost) || 0
@@ -835,6 +843,13 @@ const saveEditing = async () => {
       }
     })
     
+    // If sent_cost was changed, recalculate cost_difference
+    if ('sent_cost' in updates) {
+      const fedexCost = parseFloat(originalRecord.fedex_cost) || 0
+      const sentCost = parseFloat(updates.sent_cost) || 0
+      updates.cost_difference = Math.abs(fedexCost - sentCost).toFixed(2)
+    }
+    
     // Handle FedEx return and stage update
     if ('fedex_return' in updates) {
       const fedexCost = parseFloat(editingRecord.value.fedex_cost) || 0
@@ -872,12 +887,17 @@ const saveEditing = async () => {
         return record
       })
 
-      // Clear editing state immediately
-      editingRecord.value = null
+      // Update editing record if it exists
+      if (editingRecord.value && editingRecord.value.id === data[0].id) {
+        editingRecord.value = { ...editingRecord.value, ...data[0] }
+      }
+
       const message = updates.stage 
         ? `Record updated and stage changed to ${updates.stage}`
         : 'Record updated successfully'
       showSuccessMessage(message)
+      
+      return data[0]
     }
   } catch (err) {
     console.error('Save error:', err)
