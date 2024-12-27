@@ -143,124 +143,181 @@
         <div class="flex justify-end">
           <button
             @click="downloadResults"
-            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 
-                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-                   transition-colors duration-200"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             Download Results
           </button>
         </div>
 
-        <div class="bg-white rounded-lg shadow overflow-hidden">
+        <!-- Results Table -->
+        <div v-for="table in tables" :key="table.tableName" class="bg-white rounded-lg shadow overflow-hidden">
+          <!-- Table Header -->
           <div class="p-4 bg-gray-50 border-b border-gray-200">
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-lg font-medium text-gray-900">
-                Invoice Records ({{ invoiceResults?.length || 0 }} records)
+                {{ table.title }} ({{ table.records.length }} records)
               </h2>
-              <button
-                @click="table.toggleAllRowsSelected()"
-                class="text-sm text-blue-600 hover:text-blue-800"
-              >
-                {{ table.getIsAllRowsSelected() ? 'Deselect All' : 'Select All' }}
-              </button>
+              <div class="flex space-x-4">
+                <button
+                  v-if="selectedRows.size > 0"
+                  @click="sendSelectedToFedex"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  :disabled="isSending"
+                >
+                  {{ isSending ? 'Sending...' : `Send ${selectedRows.size} to FedEx` }}
+                </button>
+                <button
+                  @click="table.isMinimized = !table.isMinimized"
+                  class="text-gray-500 hover:text-gray-700"
+                >
+                  {{ table.isMinimized ? 'Show' : 'Hide' }}
+                </button>
+              </div>
             </div>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <template v-for="header in table.getFlatHeaders()" :key="header.id">
-                    <th
-                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      :class="{
-                        'cursor-pointer select-none': header.column.getCanSort(),
-                        'text-right': header.column.columnDef.meta?.align === 'right'
-                      }"
-                      @click="header.column.getToggleSortingHandler()"
-                    >
-                      <div class="flex items-center space-x-2">
-                        <span>{{ header.column.columnDef.header }}</span>
-                        <span v-if="header.column.getCanSort()" class="text-gray-400">
-                          {{
-                            header.column.getIsSorted() === 'asc'
-                              ? '↑'
-                              : header.column.getIsSorted() === 'desc'
-                              ? '↓'
-                              : '↕'
-                          }}
-                        </span>
-                      </div>
+          <!-- Table Content -->
+          <div v-if="!table.isMinimized">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <!-- Select All Checkbox -->
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        :checked="isAllSelected"
+                        @change="toggleSelectAll"
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
                     </th>
-                  </template>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="row in table.getRowModel().rows" :key="row.id">
-                  <td
-                    v-for="cell in row.getVisibleCells()"
-                    :key="cell.id"
-                    class="px-6 py-4 text-sm"
-                    :class="{
-                      'text-right': cell.column.columnDef.meta?.align === 'right',
-                      'min-w-[150px]': ['recipient', 'tracking_number', 'invoice_number'].includes(cell.column.id),
-                      'min-w-[120px]': ['fedex_cost', 'sent_cost', 'cost_difference', 'fedex_return'].includes(cell.column.id),
-                      'min-w-[100px]': ['country', 'dimensions', 'sent_dimensions'].includes(cell.column.id),
-                    }"
-                  >
-                    <template v-if="cell.column.id === 'actions'">
-                      <div class="flex space-x-2">
-                        <button
-                          v-if="!isEditing(row.original.id)"
-                          @click="startEditing(row.original)"
-                          class="text-blue-600 hover:text-blue-800"
-                        >
-                          Edit
-                        </button>
-                        <template v-else>
+                    <th
+                      v-for="header in table.headers"
+                      :key="header.key"
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      {{ header.label }}
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="record in filteredResults" :key="record.id">
+                    <!-- Row Checkbox -->
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        :checked="selectedRows.has(record.id)"
+                        @change="toggleRowSelection(record.id)"
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </td>
+                    <td
+                      v-for="header in table.headers"
+                      :key="header.key"
+                      class="px-6 py-4 text-sm text-gray-900"
+                      :class="{
+                        'text-right': header.type === 'currency',
+                        [getCostDifferenceClass(record[header.key])]: header.key === 'cost_difference'
+                      }"
+                    >
+                      <!-- Status Select -->
+                      <template v-if="header.type === 'status-select'">
+                        <SentStatusSelect
+                          v-model="record.stage"
+                          :disabled="isSaving"
+                          :options="header.options"
+                          @update:modelValue="(newStatus) => updateField({
+                            recordId: record.id,
+                            tableName: table.tableName,
+                            fieldName: header.key,
+                            newValue: newStatus
+                          })"
+                        />
+                      </template>
+
+                      <!-- Edit Column -->
+                      <template v-else-if="header.type === 'edit'">
+                        <div class="flex space-x-2">
                           <button
+                            v-if="editingRecord && editingRecord.id === record.id"
                             @click="saveEditing"
-                            class="text-green-600 hover:text-green-800"
                             :disabled="isSaving"
+                            class="text-sm px-2 py-1 text-white bg-green-500 rounded hover:bg-green-600 disabled:bg-gray-400"
                           >
-                            Save
+                            {{ isSaving ? 'Saving...' : 'Save' }}
                           </button>
                           <button
+                            v-if="editingRecord && editingRecord.id === record.id"
                             @click="cancelEditing"
-                            class="text-red-600 hover:text-red-800"
                             :disabled="isSaving"
+                            class="text-sm px-2 py-1 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 disabled:bg-gray-100"
                           >
                             Cancel
                           </button>
-                        </template>
+                          <button
+                            v-else
+                            @click="startEditing(record)"
+                            class="text-sm px-2 py-1 text-blue-700 bg-blue-100 rounded hover:bg-blue-200"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </template>
+
+                      <!-- Editable Fields -->
+                      <template v-else-if="header.editable">
+                        <div v-if="editingRecord && editingRecord.id === record.id">
+                          <input
+                            v-if="header.type === 'currency'"
+                            type="number"
+                            step="0.01"
+                            v-model="editingRecord[header.key]"
+                            class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <input
+                            v-else
+                            type="text"
+                            v-model="editingRecord[header.key]"
+                            class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div v-else>
+                          {{ formatFieldValue(record[header.key], header.type) }}
+                        </div>
+                      </template>
+
+                      <!-- Non-editable Fields -->
+                      <template v-else>
+                        <div 
+                          :class="{
+                            'text-right': header.type === 'currency',
+                            [getCostDifferenceClass(record[header.key])]: header.key === 'cost_difference'
+                          }"
+                        >
+                          {{ formatFieldValue(record[header.key], header.type) }}
+                        </div>
+                      </template>
+                    </td>
+
+                    <!-- Actions Column -->
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div class="flex space-x-2">
                         <button
-                          @click="sendSingleToFedex(row.original.id)"
-                          :disabled="isSending || row.original.stage === 'Sent'"
-                          class="text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+                          @click="sendSingleToFedex(record.id)"
+                          :disabled="isSending || record.stage === 'Sent'"
+                          class="text-sm px-2 py-1 text-white bg-blue-500 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
                           Send to FedEx
                         </button>
                       </div>
-                    </template>
-                    <template v-else-if="isEditing(row.original.id)">
-                      <EditableField
-                        :value="row.original[cell.column.id]"
-                        :record-id="row.original.id"
-                        :table-name="'invoice_records'"
-                        :field-name="cell.column.id"
-                        :tracking-number="row.original.tracking_number"
-                        :is-saving="isSaving"
-                        :type="getFieldType(cell.column.id)"
-                        @update="updateField"
-                      />
-                    </template>
-                    <template v-else>
-                      {{ formatFieldValue(row.original[cell.column.id], getFieldType(cell.column.id)) }}
-                    </template>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -307,7 +364,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import * as XLSX from 'xlsx'
 import { supabaseDb } from '../config/supabase'
 import EditableField from '../components/common/EditableField.vue'
-import { useInvoiceTable } from '../composables/useInvoiceTable'
+import SentStatusSelect from './SentStatusSelect.vue'
+import FedexActionButton from '../components/common/FedexActionButton.vue'
 
 const processBatch = async (records, batchSize = 10, delayMs = 1000) => {
   const results = []
@@ -803,6 +861,14 @@ const saveEditing = async () => {
       updates.stage = fedexReturn >= costDifference ? 'Finished' : 'Resend'
     }
 
+    // If no changes were made, return early
+    if (Object.keys(updates).length === 0) {
+      showSuccessMessage('No changes to save')
+      editingRecord.value = null
+      isSaving.value = false
+      return
+    }
+
     const { data, error: updateError } = await supabaseDb
       .from('invoice_records')
       .update(updates)
@@ -1193,17 +1259,6 @@ const tables = computed(() => {
     records: filteredResults.value
   }]
 })
-
-const { table, isEditing, sorting } = useInvoiceTable(invoiceResults, selectedRows, editingRecord)
-
-const getFieldType = (columnId) => {
-  if (['fedex_cost', 'sent_cost', 'cost_difference', 'fedex_return'].includes(columnId)) {
-    return 'currency'
-  }
-  return 'text'
-}
-
-// ... keep rest of the script ... 
 </script>
 
 <style scoped>
