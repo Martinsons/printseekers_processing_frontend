@@ -770,8 +770,11 @@ const updateField = async (updateData) => {
         updates.stage = fedexReturn >= costDifference ? 'Finished' : 'Resend'
       }
     } else {
-      updates[updateData.fieldName] = updateData.value
+      // For all other updates, keep the existing stage
+      delete updates.stage
     }
+
+    updates[updateData.fieldName] = updateData.value
 
     const { data, error: updateError } = await supabaseDb
       .from('invoice_records')
@@ -846,6 +849,9 @@ const saveEditing = async () => {
       
       // Mark as Finished if FedEx returned equal or more than the cost difference
       updates.stage = fedexReturn >= costDifference ? 'Finished' : 'Resend'
+    } else {
+      // For all other updates, keep the existing stage
+      delete updates.stage
     }
 
     const { data, error: updateError } = await supabaseDb
