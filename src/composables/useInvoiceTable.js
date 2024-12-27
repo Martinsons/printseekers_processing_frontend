@@ -5,7 +5,7 @@ import {
   getSortedRowModel,
   getFilteredRowModel,
 } from '@tanstack/vue-table'
-import { computed, ref } from 'vue'
+import { computed, ref, h } from 'vue'
 
 export const useInvoiceTable = (invoiceResults, selectedRows, editingRecord) => {
   const columnHelper = createColumnHelper()
@@ -14,22 +14,20 @@ export const useInvoiceTable = (invoiceResults, selectedRows, editingRecord) => 
   const columns = [
     columnHelper.display({
       id: 'select',
-      header: ({ table }) => (
-        <input
-          type="checkbox"
-          checked={table.getIsAllRowsSelected()}
-          onChange={table.getToggleAllRowsSelectedHandler()}
-          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-        />
-      ),
-      cell: ({ row }) => (
-        <input
-          type="checkbox"
-          checked={row.getIsSelected()}
-          onChange={row.getToggleSelectedHandler()}
-          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-        />
-      ),
+      header: ({ table }) => 
+        h('input', {
+          type: 'checkbox',
+          checked: table.getIsAllRowsSelected(),
+          onChange: (e) => table.toggleAllRowsSelected(),
+          class: 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+        }),
+      cell: ({ row }) => 
+        h('input', {
+          type: 'checkbox',
+          checked: row.getIsSelected(),
+          onChange: (e) => row.toggleSelected(),
+          class: 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+        }),
       enableSorting: false,
     }),
     columnHelper.accessor('stage', {
@@ -51,14 +49,17 @@ export const useInvoiceTable = (invoiceResults, selectedRows, editingRecord) => 
     columnHelper.accessor('fedex_cost', {
       header: 'Fedex Cost',
       cell: (info) => info.getValue(),
+      meta: { align: 'right' }
     }),
     columnHelper.accessor('sent_cost', {
       header: 'Sent Cost',
       cell: (info) => info.getValue(),
+      meta: { align: 'right' }
     }),
     columnHelper.accessor('cost_difference', {
       header: 'Cost Difference',
       cell: (info) => info.getValue(),
+      meta: { align: 'right' }
     }),
     columnHelper.accessor('cql_number', {
       header: 'CQL Number',
@@ -67,6 +68,7 @@ export const useInvoiceTable = (invoiceResults, selectedRows, editingRecord) => 
     columnHelper.accessor('fedex_return', {
       header: 'Fedex Return',
       cell: (info) => info.getValue(),
+      meta: { align: 'right' }
     }),
     columnHelper.accessor('country', {
       header: 'Country',
@@ -83,7 +85,7 @@ export const useInvoiceTable = (invoiceResults, selectedRows, editingRecord) => 
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
-      cell: () => null, // We'll handle this in the template
+      cell: () => null,
     }),
   ]
 
@@ -113,7 +115,7 @@ export const useInvoiceTable = (invoiceResults, selectedRows, editingRecord) => 
             .rows.map((row) => row.original.id)
         )
       )
-      selectedRows.value = newSelection
+      selectedRows.value = Array.from(newSelection)
     },
   })
 
