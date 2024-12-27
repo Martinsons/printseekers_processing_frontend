@@ -6,9 +6,14 @@
         <input
           v-model="editValue"
           :type="inputType"
-          class="w-full min-w-[120px] p-2 text-sm border-2 border-blue-300 rounded-md 
+          class="w-full p-2 text-sm border-2 border-blue-300 rounded-md 
                  shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 
                  focus:border-transparent bg-white"
+          :class="{
+            'min-w-[150px]': ['recipient', 'tracking_number', 'invoice_number'].includes(fieldName),
+            'min-w-[120px]': ['fedex_cost', 'sent_cost', 'cost_difference', 'fedex_return'].includes(fieldName),
+            'min-w-[100px]': ['country', 'dimensions', 'sent_dimensions'].includes(fieldName),
+          }"
           :placeholder="placeholder"
           :step="inputType === 'number' ? '0.01' : undefined"
           @keyup.enter="saveChanges"
@@ -61,7 +66,11 @@
           'px-2 py-1 rounded-md transition-colors duration-200',
           canEdit ? 'cursor-pointer hover:bg-gray-100' : '',
           value === 'N/A' ? 'text-red-500 italic' : 'text-gray-900',
-          'min-w-[80px] inline-block'
+          {
+            'min-w-[150px] inline-block': ['recipient', 'tracking_number', 'invoice_number'].includes(fieldName),
+            'min-w-[120px] inline-block': ['fedex_cost', 'sent_cost', 'cost_difference', 'fedex_return'].includes(fieldName),
+            'min-w-[100px] inline-block': ['country', 'dimensions', 'sent_dimensions'].includes(fieldName),
+          }
         ]"
       >
         {{ displayValue }}

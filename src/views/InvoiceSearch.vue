@@ -217,7 +217,12 @@
                     <td
                       v-for="header in table.headers"
                       :key="header.key"
-                      class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                      class="px-6 py-4 text-sm text-gray-900"
+                      :class="{
+                        'min-w-[150px]': ['recipient', 'tracking_number', 'invoice_number'].includes(header.key),
+                        'min-w-[120px]': ['fedex_cost', 'sent_cost', 'cost_difference', 'fedex_return'].includes(header.key),
+                        'min-w-[100px]': ['country', 'dimensions', 'sent_dimensions'].includes(header.key),
+                      }"
                     >
                       <!-- Status Select -->
                       <template v-if="header.type === 'status-select'">
