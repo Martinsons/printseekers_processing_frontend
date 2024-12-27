@@ -82,7 +82,7 @@
       <button
         @click="performSearch"
         :disabled="!canSearch"
-        class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+        class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
       >
         <svg 
           v-if="isLoading"
@@ -98,7 +98,7 @@
       </button>
       <button
         @click="clearSearch"
-        class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+        class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center space-x-2"
       >
         <span>Clear Search</span>
       </button>
@@ -137,447 +137,225 @@
     </div>
 
     <div class="space-y-6">
-      <!-- View Toggle -->
-      <div class="flex justify-end mb-4">
-        <div class="inline-flex rounded-lg border border-gray-200 p-1">
-          <button
-            @click="viewMode = 'table'"
-            :class="[
-              'px-4 py-2 text-sm rounded-md transition-colors duration-200',
-              viewMode === 'table' 
-                ? 'bg-blue-500 text-white' 
-                : 'text-gray-600 hover:bg-gray-100'
-            ]"
-          >
-            <i class="fas fa-table mr-2"></i>Table View
-          </button>
-          <button
-            @click="viewMode = 'cards'"
-            :class="[
-              'px-4 py-2 text-sm rounded-md transition-colors duration-200',
-              viewMode === 'cards' 
-                ? 'bg-blue-500 text-white' 
-                : 'text-gray-600 hover:bg-gray-100'
-            ]"
-          >
-            <i class="fas fa-th-large mr-2"></i>Card View
-          </button>
-        </div>
-      </div>
-
       <!-- Results Section -->
       <div v-if="hasResults" class="space-y-4">
         <!-- Download Results Button -->
         <div class="flex justify-end">
           <button
             @click="downloadResults"
-            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 
-                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-                   transition-colors duration-200"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             Download Results
           </button>
         </div>
 
-        <!-- Card View -->
-        <div v-if="viewMode === 'cards'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div
-            v-for="record in filteredResults"
-            :key="record.id"
-            class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
-          >
-            <!-- Card Header -->
-            <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <div class="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  :checked="selectedRows.has(record.id)"
-                  @change="toggleRowSelection(record.id)"
-                  class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span class="font-medium text-gray-900">Invoice #{{ record.invoice_number }}</span>
-              </div>
-              <div class="flex items-center space-x-2">
-                <span 
-                  :class="[
-                    'px-2 py-1 text-sm rounded-full',
-                    record.stage === 'Finished' ? 'bg-green-100 text-green-800' :
-                    record.stage === 'Resend' ? 'bg-yellow-100 text-yellow-800' :
-                    record.stage === 'Sent' ? 'bg-blue-100 text-blue-800' :
-                    'bg-gray-100 text-gray-800'
-                  ]"
+        <!-- Results Table -->
+        <div v-for="table in tables" :key="table.tableName" class="bg-white rounded-lg shadow overflow-hidden">
+          <!-- Table Header -->
+          <div class="p-4 bg-gray-50 border-b border-gray-200">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-lg font-medium text-gray-900">
+                {{ table.title }} ({{ table.records.length }} records)
+              </h2>
+              <div class="flex space-x-4">
+                <button
+                  v-if="selectedRows.size > 0"
+                  @click="sendSelectedToFedex"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  :disabled="isSending"
                 >
-                  {{ record.stage }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Card Content -->
-            <div class="p-4 space-y-4">
-              <!-- Tracking Info -->
-              <div class="space-y-2">
-                <h3 class="text-sm font-medium text-gray-500">Tracking Information</h3>
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <div class="text-xs text-gray-500">Tracking Number</div>
-                    <editable-field
-                      :value="record.tracking_number"
-                      :record-id="record.id"
-                      table-name="invoice_records"
-                      field-name="tracking_number"
-                      :tracking-number="record.tracking_number"
-                      type="text"
-                      @update="updateField"
-                    />
-                  </div>
-                  <div>
-                    <div class="text-xs text-gray-500">Recipient</div>
-                    <editable-field
-                      :value="record.recipient"
-                      :record-id="record.id"
-                      table-name="invoice_records"
-                      field-name="recipient"
-                      :tracking-number="record.tracking_number"
-                      type="text"
-                      @update="updateField"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Cost Information -->
-              <div class="space-y-2">
-                <h3 class="text-sm font-medium text-gray-500">Cost Information</h3>
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <div class="text-xs text-gray-500">FedEx Cost</div>
-                    <editable-field
-                      :value="record.fedex_cost"
-                      :record-id="record.id"
-                      table-name="invoice_records"
-                      field-name="fedex_cost"
-                      :tracking-number="record.tracking_number"
-                      type="currency"
-                      suffix="€"
-                      @update="updateField"
-                    />
-                  </div>
-                  <div>
-                    <div class="text-xs text-gray-500">Sent Cost</div>
-                    <editable-field
-                      :value="record.sent_cost"
-                      :record-id="record.id"
-                      table-name="invoice_records"
-                      field-name="sent_cost"
-                      :tracking-number="record.tracking_number"
-                      type="currency"
-                      suffix="€"
-                      @update="updateField"
-                    />
-                  </div>
-                  <div>
-                    <div class="text-xs text-gray-500">Cost Difference</div>
-                    <span :class="getCostDifferenceClass(record.cost_difference)">
-                      {{ formatCurrency(record.cost_difference) }}
-                    </span>
-                  </div>
-                  <div>
-                    <div class="text-xs text-gray-500">FedEx Return</div>
-                    <editable-field
-                      :value="record.fedex_return"
-                      :record-id="record.id"
-                      table-name="invoice_records"
-                      field-name="fedex_return"
-                      :tracking-number="record.tracking_number"
-                      type="currency"
-                      suffix="€"
-                      @update="updateField"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Package Information -->
-              <div class="space-y-2">
-                <h3 class="text-sm font-medium text-gray-500">Package Information</h3>
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <div class="text-xs text-gray-500">Country</div>
-                    <editable-field
-                      :value="record.country"
-                      :record-id="record.id"
-                      table-name="invoice_records"
-                      field-name="country"
-                      :tracking-number="record.tracking_number"
-                      type="text"
-                      @update="updateField"
-                    />
-                  </div>
-                  <div>
-                    <div class="text-xs text-gray-500">Dimensions</div>
-                    <editable-field
-                      :value="record.dimensions"
-                      :record-id="record.id"
-                      table-name="invoice_records"
-                      field-name="dimensions"
-                      :tracking-number="record.tracking_number"
-                      type="text"
-                      @update="updateField"
-                    />
-                  </div>
-                  <div>
-                    <div class="text-xs text-gray-500">Sent Dimensions</div>
-                    <editable-field
-                      :value="record.sent_dimensions"
-                      :record-id="record.id"
-                      table-name="invoice_records"
-                      field-name="sent_dimensions"
-                      :tracking-number="record.tracking_number"
-                      type="text"
-                      @update="updateField"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Actions -->
-              <div class="pt-4 border-t border-gray-200">
-                <div class="flex justify-end space-x-2">
-                  <button
-                    @click="sendSingleToFedex(record.id)"
-                    :disabled="isSending || record.stage === 'Sent'"
-                    class="px-3 py-1 text-sm bg-blue-500 text-white rounded-md 
-                           hover:bg-blue-600 focus:outline-none focus:ring-2 
-                           focus:ring-blue-500 focus:ring-offset-1 transition-colors 
-                           duration-200 disabled:bg-gray-300"
-                  >
-                    Send to FedEx
-                  </button>
-                </div>
+                  {{ isSending ? 'Sending...' : `Send ${selectedRows.size} to FedEx` }}
+                </button>
+                <button
+                  @click="table.isMinimized = !table.isMinimized"
+                  class="text-gray-500 hover:text-gray-700"
+                >
+                  {{ table.isMinimized ? 'Show' : 'Hide' }}
+                </button>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Table View (Existing) -->
-        <div v-else class="bg-white rounded-lg shadow overflow-hidden">
-          <!-- Download Results Button -->
-          <div class="flex justify-end">
-            <button
-              @click="downloadResults"
-              class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-                     transition-colors duration-200"
-            >
-              Download Results
-            </button>
-          </div>
-
-          <!-- Results Table -->
-          <div v-for="table in tables" :key="table.tableName" class="bg-white rounded-lg shadow overflow-hidden">
-            <!-- Table Header -->
-            <div class="p-4 bg-gray-50 border-b border-gray-200">
-              <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-medium text-gray-900">
-                  {{ table.title }} ({{ table.records.length }} records)
-                </h2>
-                <div class="flex space-x-4">
-                  <button
-                    v-if="selectedRows.size > 0"
-                    @click="sendSelectedToFedex"
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    :disabled="isSending"
-                  >
-                    {{ isSending ? 'Sending...' : `Send ${selectedRows.size} to FedEx` }}
-                  </button>
-                  <button
-                    @click="table.isMinimized = !table.isMinimized"
-                    class="text-gray-500 hover:text-gray-700"
-                  >
-                    {{ table.isMinimized ? 'Show' : 'Hide' }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Table Content -->
-            <div v-if="!table.isMinimized">
-              <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                  <thead class="bg-gray-50">
-                    <tr>
-                      <!-- Select All Checkbox -->
-                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <input
-                          type="checkbox"
-                          :checked="isAllSelected"
-                          @change="toggleSelectAll"
-                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          <!-- Table Content -->
+          <div v-if="!table.isMinimized">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <!-- Select All Checkbox -->
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        :checked="isAllSelected"
+                        @change="toggleSelectAll"
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </th>
+                    <th
+                      v-for="header in table.headers"
+                      :key="header.key"
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      {{ header.label }}
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="record in filteredResults" :key="record.id">
+                    <!-- Row Checkbox -->
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        :checked="selectedRows.has(record.id)"
+                        @change="toggleRowSelection(record.id)"
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </td>
+                    <td
+                      v-for="header in table.headers"
+                      :key="header.key"
+                      class="px-6 py-4 text-sm text-gray-900"
+                      :class="{
+                        'min-w-[150px]': ['recipient', 'tracking_number', 'invoice_number'].includes(header.key),
+                        'min-w-[120px]': ['fedex_cost', 'sent_cost', 'cost_difference', 'fedex_return'].includes(header.key),
+                        'min-w-[100px]': ['country', 'dimensions', 'sent_dimensions'].includes(header.key),
+                      }"
+                    >
+                      <!-- Status Select -->
+                      <template v-if="header.type === 'status-select'">
+                        <SentStatusSelect
+                          v-model="record.stage"
+                          :disabled="isSaving"
+                          :options="header.options"
+                          @update:modelValue="(newStatus) => updateField({
+                            recordId: record.id,
+                            tableName: table.tableName,
+                            fieldName: header.key,
+                            newValue: newStatus
+                          })"
                         />
-                      </th>
-                      <th
-                        v-for="header in table.headers"
-                        :key="header.key"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        {{ header.label }}
-                      </th>
-                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody class="bg-white divide-y divide-gray-200">
-                    <tr v-for="record in filteredResults" :key="record.id">
-                      <!-- Row Checkbox -->
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          :checked="selectedRows.has(record.id)"
-                          @change="toggleRowSelection(record.id)"
-                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                      </td>
-                      <td
-                        v-for="header in table.headers"
-                        :key="header.key"
-                        class="px-6 py-4 text-sm text-gray-900"
-                        :class="{
-                          'min-w-[150px]': ['recipient', 'tracking_number', 'invoice_number'].includes(header.key),
-                          'min-w-[120px]': ['fedex_cost', 'sent_cost', 'cost_difference', 'fedex_return'].includes(header.key),
-                          'min-w-[100px]': ['country', 'dimensions', 'sent_dimensions'].includes(header.key),
-                        }"
-                      >
-                        <!-- Status Select -->
-                        <template v-if="header.type === 'status-select'">
-                          <SentStatusSelect
-                            v-model="record.stage"
-                            :disabled="isSaving"
-                            :options="header.options"
-                            @update:modelValue="(newStatus) => updateField({
-                              recordId: record.id,
-                              tableName: table.tableName,
-                              fieldName: header.key,
-                              newValue: newStatus
-                            })"
-                          />
-                        </template>
+                      </template>
 
-                        <!-- Edit Column -->
-                        <template v-else-if="header.type === 'edit'">
-                          <div class="flex space-x-2">
-                            <button
-                              v-if="editingRecord && editingRecord.id === record.id"
-                              @click="saveEditing"
-                              :disabled="isSaving"
-                              class="text-sm px-2 py-1 text-white bg-green-500 rounded hover:bg-green-600 disabled:bg-gray-400"
-                            >
-                              {{ isSaving ? 'Saving...' : 'Save' }}
-                            </button>
-                            <button
-                              v-if="editingRecord && editingRecord.id === record.id"
-                              @click="cancelEditing"
-                              :disabled="isSaving"
-                              class="text-sm px-2 py-1 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 disabled:bg-gray-100"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              v-else
-                              @click="startEditing(record)"
-                              class="text-sm px-2 py-1 text-blue-700 bg-blue-100 rounded hover:bg-blue-200"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        </template>
-
-                        <!-- Editable Fields -->
-                        <template v-else-if="header.editable">
-                          <div v-if="editingRecord && editingRecord.id === record.id">
-                            <input
-                              v-if="header.type === 'currency'"
-                              type="number"
-                              step="0.01"
-                              v-model="editingRecord[header.key]"
-                              class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-500"
-                            />
-                            <input
-                              v-else
-                              type="text"
-                              v-model="editingRecord[header.key]"
-                              class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                          <div v-else>
-                            {{ formatFieldValue(record[header.key], header.type) }}
-                          </div>
-                        </template>
-
-                        <!-- Non-editable Fields -->
-                        <template v-else>
-                          <div 
-                            :class="{
-                              'text-right': header.type === 'currency',
-                              [getCostDifferenceClass(record[header.key])]: header.key === 'cost_difference'
-                            }"
-                          >
-                            {{ formatFieldValue(record[header.key], header.type) }}
-                          </div>
-                        </template>
-                      </td>
-
-                      <!-- Actions Column -->
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <!-- Edit Column -->
+                      <template v-else-if="header.type === 'edit'">
                         <div class="flex space-x-2">
                           <button
-                            @click="sendSingleToFedex(record.id)"
-                            :disabled="isSending || record.stage === 'Sent'"
-                            class="text-sm px-2 py-1 text-white bg-blue-500 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            v-if="editingRecord && editingRecord.id === record.id"
+                            @click="saveEditing"
+                            :disabled="isSaving"
+                            class="text-sm px-2 py-1 text-white bg-green-500 rounded hover:bg-green-600 disabled:bg-gray-400"
                           >
-                            Send to FedEx
+                            {{ isSaving ? 'Saving...' : 'Save' }}
+                          </button>
+                          <button
+                            v-if="editingRecord && editingRecord.id === record.id"
+                            @click="cancelEditing"
+                            :disabled="isSaving"
+                            class="text-sm px-2 py-1 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 disabled:bg-gray-100"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            v-else
+                            @click="startEditing(record)"
+                            class="text-sm px-2 py-1 text-blue-700 bg-blue-100 rounded hover:bg-blue-200"
+                          >
+                            Edit
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                      </template>
+
+                      <!-- Editable Fields -->
+                      <template v-else-if="header.editable">
+                        <div v-if="editingRecord && editingRecord.id === record.id">
+                          <input
+                            v-if="header.type === 'currency'"
+                            type="number"
+                            step="0.01"
+                            v-model="editingRecord[header.key]"
+                            class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <input
+                            v-else
+                            type="text"
+                            v-model="editingRecord[header.key]"
+                            class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div v-else>
+                          {{ formatFieldValue(record[header.key], header.type) }}
+                        </div>
+                      </template>
+
+                      <!-- Non-editable Fields -->
+                      <template v-else>
+                        <div 
+                          :class="{
+                            'text-right': header.type === 'currency',
+                            [getCostDifferenceClass(record[header.key])]: header.key === 'cost_difference'
+                          }"
+                        >
+                          {{ formatFieldValue(record[header.key], header.type) }}
+                        </div>
+                      </template>
+                    </td>
+
+                    <!-- Actions Column -->
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div class="flex space-x-2">
+                        <button
+                          @click="sendSingleToFedex(record.id)"
+                          :disabled="isSending || record.stage === 'Sent'"
+                          class="text-sm px-2 py-1 text-white bg-blue-500 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                          Send to FedEx
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-
-        <!-- No Results Message -->
-        <div v-else class="text-center py-8 text-gray-500">
-          No results found
-        </div>
       </div>
 
-      <!-- Progress Bar -->
-      <div v-if="isSending && totalToSend > 0" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white p-4 rounded-lg shadow-lg border border-gray-200 w-96">
-        <div class="text-sm font-medium text-gray-700 mb-2">
-          Sending to FedEx: {{ sendingProgress }} / {{ totalToSend }}
-        </div>
-        <div class="w-full bg-gray-200 rounded-full h-2.5">
-          <div 
-            class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
-            :style="{ width: `${(sendingProgress / totalToSend) * 100}%` }"
-          ></div>
-        </div>
-      </div>
-
-      <!-- Error Message -->
-      <div v-if="error" class="bg-red-50 p-4 rounded-lg">
-        <p class="text-red-700">{{ error }}</p>
-      </div>
-
-      <!-- Success Message -->
-      <div 
-        v-if="successMessage"
-        class="fixed bottom-4 right-4 bg-green-50 text-green-800 px-4 py-2 rounded-lg shadow-lg border border-green-200"
+      <!-- No Results Message -->
+      <div
+        v-else-if="hasSearched"
+        class="text-center py-8 text-gray-500"
       >
-        {{ successMessage }}
+        No results found
       </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div v-if="isSending && totalToSend > 0" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white p-4 rounded-lg shadow-lg border border-gray-200 w-96">
+      <div class="text-sm font-medium text-gray-700 mb-2">
+        Sending to FedEx: {{ sendingProgress }} / {{ totalToSend }}
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2.5">
+        <div 
+          class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+          :style="{ width: `${(sendingProgress / totalToSend) * 100}%` }"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div v-if="error" class="bg-red-50 p-4 rounded-lg">
+      <p class="text-red-700">{{ error }}</p>
+    </div>
+
+    <!-- Success Message -->
+    <div 
+      v-if="successMessage"
+      class="fixed bottom-4 right-4 bg-green-50 text-green-800 px-4 py-2 rounded-lg shadow-lg border border-green-200"
+    >
+      {{ successMessage }}
     </div>
   </div>
 </template>
@@ -648,7 +426,6 @@ const editedValues = ref({
 const isLoadingInvoices = ref(false)
 const availableInvoices = ref([])
 const filterNoResults = ref(false)
-const viewMode = ref('table')
 
 // Progress tracking
 const progress = ref(0)
