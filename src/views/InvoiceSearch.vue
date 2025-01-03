@@ -850,14 +850,29 @@ const saveEditing = async () => {
       updates.cost_difference = Math.abs(fedexCost - sentCost).toFixed(2)
     }
     
-    // Handle FedEx return and stage update
-    if ('fedex_return' in updates) {
+    // Handle stage updates
+    if ('stage' in updates) {
+      // If stage is being set to Finished, verify the conditions
+      if (updates.stage === 'Finished') {
+        const fedexCost = parseFloat(editingRecord.value.fedex_cost) || 0
+        const sentCost = parseFloat(editingRecord.value.sent_cost) || 0
+        const costDifference = Math.abs(fedexCost - sentCost)
+        const fedexReturn = Math.abs(parseFloat(editingRecord.value.fedex_return) || 0)
+        
+        // Only allow Finished state if fedex_return covers the cost difference
+        if (fedexReturn < costDifference) {
+          error.value = 'Cannot set to Finished: FedEx return amount must cover the cost difference'
+          isSaving.value = false
+          return
+        }
+      }
+    } else if ('fedex_return' in updates) {
+      // Handle FedEx return updates as before
       const fedexCost = parseFloat(editingRecord.value.fedex_cost) || 0
       const sentCost = parseFloat(editingRecord.value.sent_cost) || 0
       const costDifference = Math.abs(fedexCost - sentCost)
       const fedexReturn = Math.abs(parseFloat(updates.fedex_return) || 0)
       
-      // Mark as Finished if FedEx returned equal or more than the cost difference
       updates.stage = fedexReturn >= costDifference ? 'Finished' : 'Resend'
     }
 
@@ -1154,6 +1169,7 @@ const sendSingleToFedex = async (recordId) => {
     const lastName = names.slice(1).join(' ') || firstName;
 
     const fedexData = [{
+      record_id: record.id, // Add record_id for tracking
       NAME: firstName,
       SURNAME: lastName,
       'E-MAIL': 'fedex-invoices@printseekers.com',
